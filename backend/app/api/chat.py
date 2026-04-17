@@ -1,9 +1,16 @@
 """
 Chat API endpoints for communicating with the Pi coding agent via WebSocket RPC.
+
+Protocol:
+  - WebSocket connects to `pi --mode rpc` process (started in project's cwd)
+  - Messages from client → wrapped as `prompt` commands with unique `id`
+  - Output from Pi → typed as either `"response"` (matching `id`) or `"event"` (streaming)
+  - `extension_ui_request` → forwarded so frontend can respond interactively
 """
 
 import asyncio
 import json
+import uuid
 from pathlib import Path
 from typing import List
 
@@ -14,157 +21,375 @@ from ..schemas import ChatMessage, Message
 router = APIRouter()
 
 # Active Pi RPC processes and websockets
-active_rpc_processes = {}  # session_id -> (process, stdin, stdout)
-active_websockets = {}  # session_id -> WebSocket connection
+# session_id -> {"process": subprocess, "stdin": writer, "stdout": reader}
+active_rpc_processes: dict = {}
+# session_id -> WebSocket
+active_websockets: dict = {}
+
+
+# ---------------------------------------------------------------------------
+# Pi RPC helper
+# ---------------------------------------------------------------------------
 
 
 async def launch_pi_rpc(project_path: str) -> tuple:
     """
-    Launch a Pi RPC process for a project.
-    Returns the process and its stdin/stdout streams.
+    Launch a Pi RPC process for a project directory.
+
+    Returns (process, stdin, stdout).
     """
-    # Launch the Pi RPC process with the project directory as cwd
-    # pi --rpc command starts the RPC server for that project
     proc = await asyncio.create_subprocess_exec(
         "pi",
-        "--rpc",
+        "--mode",
+        "rpc",
         cwd=project_path,
         stdin=asyncio.subprocess.PIPE,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
-
     return (proc, proc.stdin, proc.stdout)
+
+
+async def send_rpc_command(stdin, command: dict) -> str:
+    """
+    Send a JSON command to Pi RPC stdin and return the generated request id.
+    The command dict is sent as a single newline-terminated JSON line.
+    """
+    req_id = str(uuid.uuid4())
+    # Attach the id if not already present
+    if "id" not in command:
+        command["id"] = req_id
+    else:
+        req_id = command["id"]
+
+    line = json.dumps(command, ensure_ascii=False)
+    await stdin.write(f"{line}\n".encode("utf-8"))
+    await stdin.drain()
+    return req_id
+
+
+# ---------------------------------------------------------------------------
+# WebSocket forwarding
+# ---------------------------------------------------------------------------
 
 
 async def forward_rpc_messages(session_id: str, websocket: WebSocket, project_path: str):
     """
-    Forward messages between WebSocket and Pi RPC process.
-    All interactions happen through this bidirectional channel.
+    Bidirectional bridge:
+      WebSocket text → Pi RPC stdin (wrapped as prompt commands)
+      Pi RPC stdout  → WebSocket (typed: response / event / extension_ui_request)
     """
-    # Launch RPC if not already running for this project
+    # Launch RPC process if not already running
     if session_id not in active_rpc_processes:
         proc, stdin, stdout = await launch_pi_rpc(project_path)
-        active_rpc_processes[session_id] = (proc, stdin, stdout)
+        active_rpc_processes[session_id] = {
+            "process": proc,
+            "stdin": stdin,
+            "stdout": stdout,
+        }
 
-    process, stdin, stdout = active_rpc_processes[session_id]
+    rpc = active_rpc_processes[session_id]
 
-    # Read Pi RPC responses and forward to WebSocket
-    read_task = asyncio.create_task(read_rpc_output(stdout, websocket, session_id))
+    read_task = asyncio.create_task(read_rpc_output(rpc["stdout"], websocket, session_id))
+    write_task = asyncio.create_task(write_rpc_input(rpc["stdin"], websocket, session_id))
 
-    # Read WebSocket messages and forward to Pi RPC
-    write_task = asyncio.create_task(write_rpc_input(stdin, websocket, session_id))
+    done, pending = await asyncio.wait(
+        {read_task, write_task},
+        return_when=asyncio.FIRST_COMPLETED,
+    )
 
-    # Wait for either task to complete
-    done, pending = await asyncio.wait({read_task, write_task}, return_when=asyncio.FIRST_COMPLETED)
-
-    # Cancel the other task
     for task in pending:
         task.cancel()
         try:
-            await task  # This will raise the exception from task.cancel()
-        except asyncio.CancelledError:
-            pass  # Expected when we cancel the task
-        except Exception as e:
-            print(f"Error in cancelled task: {e}")
+            await task
+        except (asyncio.CancelledError, Exception):
+            pass
 
-    # Wait for cancellation to complete
-    await asyncio.gather(*list(pending), return_exceptions=True)
+    await asyncio.gather(*pending, return_exceptions=True)
+
+
+async def _auto_reply_to_extension_request(data: dict, stdin):
+    """
+    Auto-reply to non-interactive extension_ui_request (notify, setHeader, etc.).
+
+    Pi blocks on stdout until it gets an extension_ui_response for every
+    extension_ui_request. For fire-and-forget methods (notify, setStatus,
+    setHeader, setFooter, setTitle, setWidget, etc.) we send an automatic
+    ack so Pi can continue processing.
+
+    For interactive methods (select, confirm, input, editor) we forward to
+    the frontend via WebSocket and wait for user input.
+    """
+    method = data.get("method", "")
+    fire_and_forget = {
+        "notify",
+        "setStatus",
+        "setTitle",
+        "setFooter",
+        "setHeader",
+        "setWidget",
+        "setEditorComponent",
+        "setToolsExpanded",
+        "set_editor_text",
+    }
+    interactive = {"select", "confirm", "input", "editor"}
+
+    if method in fire_and_forget:
+        # Auto-ack so Pi doesn't block
+        reply = {
+            "type": "extension_ui_response",
+            "id": data["id"],
+            "value": None,
+            "cancelled": False,
+        }
+        await stdin.write(f"{json.dumps(reply, ensure_ascii=False)}\n".encode("utf-8"))
+        await stdin.drain()
+        return True
+    elif method in interactive:
+        # Interactive — forward to frontend for user input
+        return False
+    else:
+        # Unknown method — auto-ack to prevent blocking
+        reply = {
+            "type": "extension_ui_response",
+            "id": data["id"],
+            "value": None,
+            "cancelled": False,
+        }
+        await stdin.write(f"{json.dumps(reply, ensure_ascii=False)}\n".encode("utf-8"))
+        await stdin.drain()
+        return True
 
 
 async def read_rpc_output(stdout, websocket: WebSocket, session_id: str):
     """
-    Read output from Pi RPC and send to WebSocket.
+    Read JSON lines from Pi RPC stdout and forward them to the WebSocket.
+
+    Events are typed for the frontend:
+      - {"type":"response", ...}         → forwarded as-is
+      - Extension UI request             → auto-ack or forward to frontend
+      - Any other JSON line              → wrapped as {"kind":"rpc_event", ...}
     """
+    # Grab the stdin from the active RPC process so we can auto-reply
+    rpc = active_rpc_processes.get(session_id, {})
+    stdin = rpc.get("stdin")
+
     try:
         while True:
             line = await stdout.readline()
             if not line:
                 break
 
-            line = line.decode().strip()
-            if line:
-                # Parse JSON response from Pi
-                try:
-                    data = json.loads(line)
-                    # Forward to WebSocket
-                    await websocket.send_text(json.dumps(data))
-                except json.JSONDecodeError:
-                    continue
+            decoded = line.decode().strip()
+            if not decoded:
+                continue
+
+            try:
+                data = json.loads(decoded)
+            except json.JSONDecodeError:
+                continue  # Skip non-JSON lines
+
+            # Type the event so the frontend knows how to handle it
+            if isinstance(data, dict):
+                msg_type = data.get("type")
+
+                if msg_type == "response":
+                    # Normal response — already self-describing
+                    await websocket.send_text(json.dumps(data, ensure_ascii=False))
+                elif msg_type == "extension_ui_request":
+                    # Auto-reply to fire-and-forget requests so Pi doesn't block.
+                    # Forward interactive requests to frontend.
+                    auto_acked = await _auto_reply_to_extension_request(data, stdin)
+                    if not auto_acked:
+                        # Interactive — forward to frontend
+                        wrapped = {"kind": "extension_ui_request", **data}
+                        await websocket.send_text(json.dumps(wrapped, ensure_ascii=False))
+                elif msg_type == "extension_ui_response":
+                    # Extension got a response — relay it
+                    wrapped = {"kind": "extension_ui_response", **data}
+                    await websocket.send_text(json.dumps(wrapped, ensure_ascii=False))
+                else:
+                    # Streaming events (message_start, message_update, turn_start,
+                    # message_end, agent_start, agent_end, tool_execution_*, etc.)
+                    wrapped = {"kind": "rpc_event", "event": data}
+                    await websocket.send_text(json.dumps(wrapped, ensure_ascii=False))
+            else:
+                # Non-dict line (unexpected but guard against it)
+                wrapped = {"kind": "rpc_event", "event": decoded}
+                await websocket.send_text(json.dumps(wrapped, ensure_ascii=False))
+
     except Exception as e:
         print(f"Error reading RPC output for {session_id}: {e}")
 
 
 async def write_rpc_input(stdin, websocket: WebSocket, session_id: str):
     """
-    Write messages from WebSocket to Pi RPC.
+    Receive text from WebSocket and forward to Pi RPC stdin.
+
+    Client can send:
+      - Normal strings → wrapped as {"type":"prompt","message":"...","id":"<uuid>"}
+      - Extension UI responses → forwarded directly as {type:"extension_ui_response", ...}
+      - Commands (get_state, set_model, compact, etc.) → forwarded directly
     """
     try:
         while True:
-            # Receive message from WebSocket
             data = await websocket.receive_text()
+            if not data:
+                continue
 
-            # Forward to Pi RPC stdin
-            if data:
-                await stdin.write(data.encode("utf-8"))
-                await stdin.write("\n".encode("utf-8"))
+            try:
+                payload = json.loads(data)
+            except json.JSONDecodeError:
+                payload = data  # Plain text → treat as chat message
+
+            if isinstance(payload, str):
+                # Plain text message → wrap as prompt command
+                command = {"type": "prompt", "message": payload}
+                await send_rpc_command(stdin, command)
+
+            elif isinstance(payload, dict):
+                # Structured message
+                kind = payload.get("kind")
+                msg_type = payload.get("type")
+
+                if kind == "extension_ui_response":
+                    # Extension replied to an interactive prompt
+                    await stdin.write(
+                        f"{json.dumps(payload, ensure_ascii=False)}\n".encode("utf-8")
+                    )
+                    await stdin.drain()
+                elif kind == "rpc_event":
+                    # Skip events going upstream
+                    continue
+                elif msg_type in (
+                    "prompt",
+                    "steer",
+                    "follow_up",
+                    "set_model",
+                    "cycle_model",
+                    "get_available_models",
+                    "get_state",
+                    "get_messages",
+                    "get_session_stats",
+                    "compact",
+                    "set_auto_compaction",
+                    "set_thinking_level",
+                    "cycle_thinking_level",
+                    "set_steering_mode",
+                    "set_follow_up_mode",
+                    "get_commands",
+                ):
+                    # Known RPC command — send as-is
+                    await send_rpc_command(stdin, payload)
+                elif msg_type == "extension_ui_response":
+                    # Already handled above
+                    await stdin.write(
+                        f"{json.dumps(payload, ensure_ascii=False)}\n".encode("utf-8")
+                    )
+                    await stdin.drain()
+                elif msg_type == "abort":
+                    # Abort is special — no id needed
+                    await stdin.write('{"type": "abort"}\n'.encode("utf-8"))
+                    await stdin.drain()
+                elif msg_type == "prompt":
+                    # User message → wrap with prompt type
+                    cmd = {"type": "prompt", "message": payload.get("message", "")}
+                    await send_rpc_command(stdin, cmd)
+                else:
+                    # Unknown dict — try to forward as-is
+                    await send_rpc_command(stdin, payload)
+            else:
+                # Fallback: send raw
+                await stdin.write(f"{json.dumps(payload)}\n".encode("utf-8"))
                 await stdin.drain()
+
     except Exception as e:
         print(f"Error writing RPC input for {session_id}: {e}")
 
 
-@router.websocket("/ws/rpc/{project_name}")
+# ---------------------------------------------------------------------------
+# WebSocket endpoint
+# ---------------------------------------------------------------------------
+
+
+@router.websocket("/ws")
 async def rpc_websocket_endpoint(websocket: WebSocket, project_name: str):
     """
     WebSocket endpoint for Pi RPC communication.
-    All interactions with Pi happen through this WebSocket.
+
+    Route: /api/projects/{project_name}/ws/{project_name}
+    The second segment (project_name in path) is kept for session scoping
+    but is the same value as the prefix parameter.
     """
     await websocket.accept()
 
-    # Generate session ID for this connection
-    session_id = f"session_{project_name}_{websocket.headers.get('User-Agent', 'web')}"
+    session_id = f"ws_{project_name}_{uuid.uuid4().hex[:8]}"
 
     try:
-        # Store the websocket connection
         active_websockets[session_id] = websocket
-
-        # Get the project path
         project_path = str(Path.cwd() / project_name)
 
-        # Start forwarding messages
         await forward_rpc_messages(session_id, websocket, project_path)
 
     except WebSocketDisconnect:
-        print(f"WebSocket disconnected for {project_name}")
+        print(f"WebSocket disconnected for project={project_name}")
+        await _cleanup_session(session_id)
 
-        # Clean up
-        if session_id in active_rpc_processes:
-            proc, _, _ = active_rpc_processes[session_id]
-            proc.terminate()
-            del active_rpc_processes[session_id]
+    except Exception as e:
+        print(f"WebSocket error for project={project_name}: {e}")
+        await _cleanup_session(session_id)
 
-        if session_id in active_websockets:
-            del active_websockets[session_id]
+
+async def _cleanup_session(session_id: str):
+    """Terminate Pi RPC process and clean up tracking dicts."""
+    if session_id in active_rpc_processes:
+        rpc = active_rpc_processes[session_id]
+        proc = rpc.get("process")
+        if proc and proc.returncode is None:
+            try:
+                proc.terminate()
+                # Give it a moment, then kill if still alive
+                await asyncio.sleep(0.1)
+                if proc.returncode is None:
+                    proc.kill()
+            except Exception:
+                pass
+        del active_rpc_processes[session_id]
+
+    if session_id in active_websockets:
+        del active_websockets[session_id]
+
+
+# ---------------------------------------------------------------------------
+# REST helpers (backward compatibility)
+# ---------------------------------------------------------------------------
 
 
 @router.post("/sessions/{session_id}/chat")
 async def send_chat_message(project_name: str, session_id: str, message: ChatMessage) -> dict:
     """
-    Send a chat message to the agent.
-    This endpoint is kept for backward compatibility but should redirect to WebSocket.
+    Send a chat message. Deprecated — use the WebSocket endpoint instead.
+    If the WebSocket is active for this session, the message is forwarded there.
     """
-    # In the new workflow, all messages go through WebSocket
+    # Find the WebSocket session for this project
+    for sid, ws in active_websockets.items():
+        if project_name in sid:
+            try:
+                await ws.send_text(json.dumps({"kind": "rpc_event", "event": message.message}))
+                return {"status": "forwarded", "websocket": sid}
+            except Exception:
+                pass
+
     return {
-        "status": "deprecated",
-        "message": "Use WebSocket endpoint /ws/rpc/{project} for all communication",
-        "websocket_url": f"/ws/rpc/{project_name}",
+        "status": "no_active_connection",
+        "message": "Use the WebSocket endpoint /ws/{project} for real-time chat",
+        "websocket_url": f"/ws/{project_name}",
     }
 
 
 @router.get("/sessions/{session_id}/chat", response_model=List[Message])
 async def get_chat_history(project_name: str, session_id: str) -> List[Message]:
     """
-    Get chat history for a session.
-    Deprecated - get history through WebSocket RPC instead.
+    Get chat history. Deprecated — fetch via WebSocket using get_messages RPC command.
     """
-    return []  # History should come from Pi RPC
+    return []

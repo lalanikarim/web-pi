@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import List, Optional
 
 import aiofiles
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException
 
 from ..schemas import FileInfo
 
@@ -52,23 +52,16 @@ async def list_files(project_name: str, path: Optional[str] = "/") -> List[FileI
     return files
 
 
-@router.get("/files/{file_path:.+}")
-async def read_file(request: Request, file_path: str) -> str:
+@router.get("/files/read/{file_path:path}")
+async def read_file(project_name: str, file_path: str) -> str:
     """
     Read file contents.
+    Uses Path(...) type annotation to prevent route conflict with project_name.
     """
-    # Extract project_name from the path
-    project_name = request.path_params.get("project_name", "test-project")
-
     project_path = Path.cwd() / project_name
 
     # Resolve the file path
     target_path = project_path / file_path
-
-    print(f"Reading: project={project_name}, file={file_path}")
-    print(f"Project path: {project_path}")
-    print(f"Target path: {target_path}")
-    print(f"Target exists: {target_path.exists()}")
 
     # Security check: ensure path is within project root
     if not target_path.is_relative_to(project_path):
