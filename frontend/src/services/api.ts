@@ -39,6 +39,21 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 // ---------------------------------------------------------------------------
+// Browse / Directory Tree
+// ---------------------------------------------------------------------------
+
+export interface DirNode {
+  path: string;
+  name: string;
+  isDirectory: true;
+}
+
+export async function listDirectories(path: string = ''): Promise<DirNode[]> {
+  const qs = path ? `?path=${encodeURIComponent(path)}` : '';
+  return request<DirNode[]>(`/api/browse${qs}`);
+}
+
+// ---------------------------------------------------------------------------
 // Projects
 // ---------------------------------------------------------------------------
 

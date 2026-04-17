@@ -1,40 +1,214 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { useApp } from '../store/AppContext';
-import { listProjects } from '../services/api';
+import { listDirectories } from '../services/api';
 import './views.css';
+
+// ── Types ──────────────────────────────────────────────────────────────────
+
+interface DirItem {
+  path: string;
+  name: string;
+}
+
+// ── Recursive directory tree component ─────────────────────────────────────
+
+function DirectoryTree({
+  path,
+  depth,
+  expandedPaths,
+  search,
+  onToggle,
+  onOpen,
+}: {
+  path: string;
+  depth: number;
+  expandedPaths: Set<string>;
+  search: string;
+  onToggle: (path: string) => void;
+  onOpen: (path: string) => void;
+}) {
+  const [items, setItems] = useState<DirItem[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const loadingRef = useRef(false);
+  const isExpanded = expandedPaths.has(path);
+
+  // Load children when expanded
+  useEffect(() => {
+    if (!isExpanded) {
+      loadingRef.current = false;
+      return;
+    }
+    if (items.length > 0 || loadingRef.current) return;
+
+    loadingRef.current = true;
+    listDirectories(path)
+      .then((dirs) => {
+        setItems(dirs.map((d) => ({ ...d })));
+      })
+      .catch((e) => {
+        setError(e instanceof Error ? e.message : 'Failed to load');
+        setItems([]);
+      })
+      .finally(() => {
+        loadingRef.current = false;
+      });
+  }, [isExpanded, path, items.length]);
+
+  const filteredItems = useMemo(() => {
+    if (!search.trim()) return items;
+    const q = search.toLowerCase();
+    return items.filter((i) => i.name.toLowerCase().includes(q));
+  }, [items, search]);
+
+  if (error && items.length === 0) {
+    return (
+      <div className="folder-tree__error" style={{ paddingLeft: depth * 20 + 8 }}>
+        <span className="folder-tree__error-text">{error}</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="folder-tree">
+      {filteredItems.map((item) => (
+        <DirectoryTreeNode
+          key={item.path}
+          item={item}
+          depth={depth}
+          isExpanded={expandedPaths.has(item.path)}
+          search={search}
+          onToggle={() => onToggle(item.path)}
+          onOpen={() => onOpen(item.path)}
+        />
+      ))}
+      {filteredItems.length === 0 && items.length > 0 && (
+        <div className="folder-tree__empty" style={{ paddingLeft: depth * 20 + 8 }}>
+          {search ? 'No matching folders' : 'Empty directory'}
+        </div>
+      )}
+      {items.length === 0 && !error && isExpanded && (
+        <div className="folder-tree__loading" style={{ paddingLeft: depth * 20 + 8 }}>
+          Loading…
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Single tree node ──────────────────────────────────────────────────────
+
+function DirectoryTreeNode({
+  item,
+  depth,
+  isExpanded,
+  search,
+  onToggle,
+  onOpen,
+}: {
+  item: DirItem;
+  depth: number;
+  isExpanded: boolean;
+  search: string;
+  onToggle: () => void;
+  onOpen: () => void;
+}) {
+  // Highlight matched text in search
+  const displayName = useMemo(() => {
+    if (!search.trim()) return item.name;
+    const q = search.toLowerCase();
+    const idx = item.name.toLowerCase().indexOf(q);
+    if (idx < 0) return item.name;
+    return (
+      <>
+        {item.name.slice(0, idx)}
+        <mark className="folder-tree__mark">{item.name.slice(idx, idx + search.length)}</mark>
+        {item.name.slice(idx + search.length)}
+      </>
+    );
+  }, [item.name, search]);
+
+  return (
+    <div className="folder-tree__node">
+      <div
+        className={`folder-tree__row ${isExpanded ? 'folder-tree__row--expanded' : ''}`}
+        style={{ paddingLeft: depth * 20 + 8 }}
+      >
+        <button
+          className="folder-tree__toggle"
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggle();
+          }}
+          aria-expanded={isExpanded}
+          title={isExpanded ? 'Collapse' : 'Expand'}
+        >
+          {isExpanded ? '▾' : '▸'}
+        </button>
+
+        <div
+          className="folder-tree__folder-btn"
+          onClick={onToggle}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => e.key === 'Enter' && onToggle()}
+        >
+          <span className="folder-tree__icon" aria-hidden="true">
+            {isExpanded ? '📂' : '📁'}
+          </span>
+          <span className="folder-tree__name">{displayName}</span>
+        </div>
+
+        <button
+          className="folder-tree__open-btn"
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpen();
+          }}
+          title={`Open ${item.name}`}
+        >
+          Open
+        </button>
+      </div>
+
+      {isExpanded && (
+        <DirectoryTree
+          path={item.path}
+          depth={depth + 1}
+          expandedPaths={new Set()}
+          search={search}
+          onToggle={onToggle}
+          onOpen={onOpen}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Main FolderSelector ───────────────────────────────────────────────────
 
 export default function FolderSelector() {
   const { setSelectedFolder, setSelectedModel, setView } = useApp();
   const [search, setSearch] = useState('');
-  const [folders, setFolders] = useState<string[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const ROOT_PATH = ''; // empty → resolves to ~/Projects on the backend
+  const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set([ROOT_PATH]));
 
-  useEffect(() => {
-    listProjects()
-      .then((projectNames) => {
-        // Convert project names to full paths (backend returns names, we build paths)
-        // The backend lists subdirectories of ~/Projects, returns just names.
-        // We store them as-is; the path will be constructed when needed.
-        setFolders(projectNames);
-      })
-      .catch((e) => {
-        setError(e instanceof Error ? e.message : 'Failed to load projects');
-      })
-      .finally(() => setLoading(false));
-  }, []);
-
-  const filteredFolders = useMemo(() => {
-    if (!search.trim()) return folders;
-    const q = search.toLowerCase();
-    return folders.filter((f) => f.toLowerCase().includes(q));
-  }, [folders, search]);
-
-  const handleOpen = (folderName: string) => {
-    // Store the folder name (backend resolves ~/Projects/{name})
-    setSelectedFolder(folderName);
+  const handleOpen = (path: string) => {
+    const projectName = path.split('/').filter(Boolean).pop() || path;
+    setSelectedFolder(projectName);
     setSelectedModel(null);
     setView('models');
+  };
+
+  const handleToggle = (path: string) => {
+    setExpandedPaths((prev) => {
+      const next = new Set(prev);
+      if (next.has(path)) {
+        next.delete(path);
+      } else {
+        next.add(path);
+      }
+      return next;
+    });
   };
 
   if (loading) {
@@ -43,7 +217,7 @@ export default function FolderSelector() {
         <div className="view-folder__inner">
           <div className="view-folder__header">
             <h1>Open Project</h1>
-            <p className="view-folder__subtitle">Loading projects...</p>
+            <p className="view-folder__subtitle">Loading folders…</p>
           </div>
         </div>
       </div>
@@ -55,7 +229,7 @@ export default function FolderSelector() {
       <div className="view-folder__inner">
         <div className="view-folder__header">
           <h1>Open Project</h1>
-          <p className="view-folder__subtitle">Select a project folder to open with Pi</p>
+          <p className="view-folder__subtitle">Navigate to a project folder to open with Pi</p>
         </div>
 
         <div className="view-folder__search">
@@ -65,7 +239,7 @@ export default function FolderSelector() {
           </svg>
           <input
             type="text"
-            placeholder="Search folders..."
+            placeholder="Search folders…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -73,24 +247,21 @@ export default function FolderSelector() {
 
         <div className="view-folder__list">
           {error && <p className="view-folder__empty" style={{ color: '#e85d75' }}>{error}</p>}
-          {filteredFolders.length === 0 && !error && (
-            <p className="view-folder__empty">No projects found under ~/Projects</p>
+
+          <DirectoryTree
+            path={ROOT_PATH}
+            depth={0}
+            expandedPaths={expandedPaths}
+            search={search}
+            onToggle={handleToggle}
+            onOpen={handleOpen}
+          />
+
+          {expandedPaths.size === 0 && !error && (
+            <button className="view-folder__expand-all" onClick={() => setExpandedPaths(new Set([ROOT_PATH]))}>
+              ▸ Show folders
+            </button>
           )}
-          {filteredFolders.map((folder) => (
-            <div key={folder} className="view-folder__item">
-              <div className="view-folder__item-icon">
-                <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
-                  <path d="M10 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2z" />
-                </svg>
-              </div>
-              <div className="view-folder__item-content">
-                <div className="view-folder__item-name">{folder}</div>
-              </div>
-              <button className="view-folder__open-btn" onClick={() => handleOpen(folder)}>
-                Open
-              </button>
-            </div>
-          ))}
         </div>
       </div>
     </div>

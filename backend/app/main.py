@@ -11,6 +11,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import (
+    browse_router,
     chat_router,
     files_router,
     model_router,
@@ -38,6 +39,7 @@ app.add_middleware(
 
 # Include API routers
 # Note: Projects are existing folders under $HOME/Projects
+app.include_router(browse_router, prefix="/api", tags=["browse"])
 app.include_router(project_router, prefix="/api/projects", tags=["projects"])
 app.include_router(session_router, prefix="/api/projects/{project_name}", tags=["sessions"])
 app.include_router(files_router, prefix="/api/projects/{project_name}", tags=["files"])
