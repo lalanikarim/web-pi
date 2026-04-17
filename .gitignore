@@ -1,1 +1,35 @@
-.pi-lens/*
+# ===== Python =====
+# Virtual environment
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+
+# Cache & test artifacts
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+htmlcov/
+
+# ===== Node.js =====
+frontend/node_modules/
+*.tsbuildinfo
+
+# ===== Pi tooling =====
+.pi/
+.pi-lens/
+
+# ===== Environment & local config =====
+.env
+.env.local
+.env.*.local
+
+# ===== OS / Editor =====
+.DS_Store
+*.swp
+*.swo
+*~
