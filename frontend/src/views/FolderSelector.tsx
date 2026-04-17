@@ -30,6 +30,7 @@ function DirectoryTree({
   const [items, setItems] = useState<DirItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const loadingRef = useRef(false);
+  const hasFetched = useRef(false);
   const isExpanded = expandedPaths.has(path);
 
   // Load children when expanded
@@ -38,7 +39,7 @@ function DirectoryTree({
       loadingRef.current = false;
       return;
     }
-    if (items.length > 0 || loadingRef.current) return;
+    if (hasFetched.current || loadingRef.current) return;
 
     loadingRef.current = true;
     listDirectories(path)
@@ -51,6 +52,7 @@ function DirectoryTree({
       })
       .finally(() => {
         loadingRef.current = false;
+        hasFetched.current = true;
       });
   }, [isExpanded, path, items.length]);
 
