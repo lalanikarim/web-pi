@@ -76,6 +76,7 @@ function DirectoryTree({
           item={item}
           depth={depth}
           isExpanded={expandedPaths.has(item.path)}
+          expandedPaths={expandedPaths}
           search={search}
           onToggle={() => onToggle(item.path)}
           onOpen={() => onOpen(item.path)}
@@ -99,6 +100,7 @@ function DirectoryTreeNode({
   item,
   depth,
   isExpanded,
+  expandedPaths,
   search,
   onToggle,
   onOpen,
@@ -106,6 +108,7 @@ function DirectoryTreeNode({
   item: DirItem;
   depth: number;
   isExpanded: boolean;
+  expandedPaths: Set<string>;
   search: string;
   onToggle: () => void;
   onOpen: () => void;
@@ -172,7 +175,7 @@ function DirectoryTreeNode({
         <DirectoryTree
           path={item.path}
           depth={depth + 1}
-          expandedPaths={new Set()}
+          expandedPaths={expandedPaths}
           search={search}
           onToggle={onToggle}
           onOpen={onOpen}

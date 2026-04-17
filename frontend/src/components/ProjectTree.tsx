@@ -19,11 +19,13 @@ function TreeNode({
   depth,
   selectedPath,
   onSelect,
+  projectRoot,
 }: {
   node: TreeNodeData;
   depth: number;
   selectedPath: string | null;
   onSelect: (path: string) => void;
+  projectRoot: string | null;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [children, setChildren] = useState<TreeNodeData[]>(node.children);
@@ -33,7 +35,7 @@ function TreeNode({
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (node.isDirectory) {
-      setExpanded(!expanded);
+      setExpanded((prev) => !prev);
     } else {
       onSelect(node.path);
     }
@@ -44,12 +46,12 @@ function TreeNode({
     if (expanded && !fetchRef.current) {
       fetchRef.current = true;
       setLoading(true);
-      listFiles('', node.path)
+      listFiles(projectRoot || '', node.path)
         .then((items) => {
           setChildren(
             items.map((item) => ({
               name: item.path.split('/').pop() || item.path,
-              path: item.isDirectory ? node.path : `${node.path}/${item.path}`,
+              path: item.isDirectory ? `${node.path}/${item.path}` : `${node.path}/${item.path}`,
               isDirectory: item.isDirectory,
               children: [],
             }))
@@ -61,8 +63,10 @@ function TreeNode({
         .finally(() => {
           setLoading(false);
         });
+    } else if (!expanded) {
+      fetchRef.current = false;
     }
-  }, [expanded, node.path]);
+  }, [expanded, node.path, projectRoot]);
 
   const isSelected = selectedPath === node.path;
 
@@ -107,6 +111,7 @@ function TreeNode({
               depth={depth + 1}
               selectedPath={selectedPath}
               onSelect={onSelect}
+              projectRoot={projectRoot}
             />
           ))}
         </div>
@@ -217,6 +222,7 @@ export default function ProjectTree() {
             depth={0}
             selectedPath={selectedFile}
             onSelect={handleSelect}
+            projectRoot={selectedFolder}
           />
         ))}
       </div>
