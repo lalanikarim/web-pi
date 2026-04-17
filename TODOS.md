@@ -61,7 +61,46 @@ Sorted by priority (most critical first).
 
 ## Remaining
 
-- [ ] Wire frontend to backend (replace `mockData.ts` with API calls)
-- [ ] Add backend unit tests for RPC integration
+### Phase 1: Wire Frontend → Backend (Biggest Impact)
+
+#### 1.1 Replace `mockData.ts` with real API calls
+- [ ] `FolderSelector` → `GET /api/projects` to list real folders from `~/Projects`
+- [ ] `ModelSelector` → fetch models from backend (or via WebSocket `get_available_models`)
+- [ ] `ProjectTree` → `GET /api/projects/{name}/files?path=...` for directory expansion
+- [ ] `FilePreview` → `GET /api/projects/{name}/files/read/{path}` for file content
+- [ ] `useFileContent` hook → replace mock with real fetch
+- [ ] `useModels` hook → replace mock with real fetch
+
+#### 1.2 Add WebSocket client to `ChatPanel.tsx`
+- [ ] Connect to `ws://localhost:8000/api/projects/{project_name}/ws` on workspace mount
+- [ ] Send `{kind: "chat", message: "..."}` for user messages
+- [ ] Render `kind: "rpc_event"` messages as streaming assistant responses
+- [ ] Handle `kind: "response"` for command responses (model switch, state, etc.)
+- [ ] Handle `kind: "extension_ui_request"` for interactive prompts
+- [ ] Send warm-up command (`get_session_stats`) on connect
+- [ ] Handle `kind: "extension_ui_response"` auto-acks
+- [ ] Add connection status indicator (connected/disconnecting/error)
+- [ ] Add reconnection logic for WebSocket drops
+
+### Phase 2: Fix Backend Gaps
+
+#### 2.1 Fix session API to use real RPC data
+- [ ] `GET /sessions` → return real session info from RPC `get_state`
+- [ ] `GET /sessions/{id}` → return data from `get_state` response (sessionName, model, thinkingLevel, etc.)
+- [ ] Add proper session ID tracking in the RPC process mapping
+- [ ] `POST /sessions` → wire `new_session` + `set_session_name` + `set_model` fully
+
+#### 2.2 Add CORS middleware to `main.py`
+- [ ] `fastapi.middleware.cors.CORSMiddleware` for dev (frontend :5173 → backend :8000)
+- [ ] Allow origins, methods, headers
+
+### Phase 3: Polish
+
+- [ ] Implement extension UI dialog in frontend (`select`, `confirm`, `input`, `editor` methods)
+- [ ] Add loading states and error handling across all components
 - [ ] Add rate limiting and connection pooling
 - [ ] Session cleanup / auto-expunge logic
+- [ ] Backend unit tests for RPC integration
+- [ ] Export session (`export_html`, `get_messages`) via WebSocket
+- [ ] File tree search/filter
+- [ ] Model switching from UI actually calls `set_model` via WebSocket

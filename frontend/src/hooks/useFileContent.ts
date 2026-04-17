@@ -1,6 +1,6 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 import { useState, useEffect, useRef } from 'react';
-import { mockFileContent as getMockContent } from '../services/mockData';
+import { readFile } from '../services/api';
 
 interface FileContentResult {
   content: string;
@@ -9,7 +9,7 @@ interface FileContentResult {
   error: string | null;
 }
 
-export function useFileContent(_projectPath: string, filePath: string): FileContentResult {
+export function useFileContent(projectPath: string, filePath: string): FileContentResult {
   const [content, setContent] = useState('');
   const [fileName, setFileName] = useState('');
   const [loading, setLoading] = useState(false);
@@ -19,7 +19,7 @@ export function useFileContent(_projectPath: string, filePath: string): FileCont
   useEffect(() => {
     isMountedRef.current = true;
 
-    if (!filePath) {
+    if (!filePath || !projectPath) {
       setContent('');
       setFileName('');
       setError(null);
@@ -28,28 +28,31 @@ export function useFileContent(_projectPath: string, filePath: string): FileCont
     }
 
     setError(null);
+    // Extract file name from path
     const parts = filePath.split('/');
     const name = parts[parts.length - 1] || '';
     setFileName(name);
     setLoading(true);
 
-    const timer = setTimeout(() => {
-      if (isMountedRef.current) {
-        try {
-          const result = getMockContent(filePath);
-          setContent(result);
-        } catch {
-          setError('Failed to load file');
+    readFile(projectPath, filePath)
+      .then((text) => {
+        if (isMountedRef.current) {
+          setContent(text);
+          setLoading(false);
         }
-        setLoading(false);
-      }
-    }, 300);
+      })
+      .catch((e) => {
+        if (isMountedRef.current) {
+          setError(e instanceof Error ? e.message : 'Failed to load file');
+          setContent('');
+          setLoading(false);
+        }
+      });
 
     return () => {
       isMountedRef.current = false;
-      clearTimeout(timer);
     };
-  }, [filePath]);
+  }, [projectPath, filePath]);
 
   return { content, fileName, loading, error };
 }

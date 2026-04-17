@@ -1,12 +1,19 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
 import type { AppState, AppView, Model } from '../types';
-import { initialModel } from '../services/mockData';
+
+const DEFAULT_MODEL: Model = {
+  id: 'claude-sonnet-4-20250514',
+  name: 'Claude Sonnet 4',
+  provider: 'Anthropic',
+  contextWindow: 200000,
+  maxTokens: 16384,
+};
 
 const initialAppState: AppState = {
   view: 'folders',
   selectedFolder: null,
-  selectedModel: initialModel,
-  currentModel: initialModel,
+  selectedModel: DEFAULT_MODEL,
+  currentModel: DEFAULT_MODEL,
   selectedFile: null,
 };
 

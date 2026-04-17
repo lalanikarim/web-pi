@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { Model } from '../types';
-import { MOCK_MODELS } from '../services/mockData';
+import { listModels } from '../services/api';
 
 export function useModels() {
   const [models, setModels] = useState<Model[]>([]);
@@ -8,20 +8,38 @@ export function useModels() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Simulate API call delay
-    const timer = setTimeout(() => {
+    let cancelled = false;
+
+    const fetchModels = async () => {
+      setLoading(true);
+      setError(null);
       try {
-        setModels(MOCK_MODELS);
-        setLoading(false);
+        const resp = await listModels();
+        if (!cancelled) {
+          const mapped: Model[] = resp.map((m) => ({
+            id: m.id,
+            name: m.name,
+            provider: m.provider,
+            contextWindow: m.contextWindow || 0,
+            maxTokens: m.maxTokens || 0,
+          }));
+          setModels(mapped);
+        }
       } catch (e) {
-        setError('Failed to load models');
-        setLoading(false);
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : 'Failed to load models');
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
-    }, 500);
+    };
 
-    return () => clearTimeout(timer);
-
-    return () => clearTimeout(timer);
+    fetchModels();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   return { models, loading, error };

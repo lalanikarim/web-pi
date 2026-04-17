@@ -7,6 +7,9 @@ file browsing, model management, and chat with the Pi coding agent via WebSocket
 All interactions with Pi happen through WebSocket after starting pi --rpc.
 """
 
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
 from app.api import (
     chat_router,
     files_router,
@@ -14,7 +17,6 @@ from app.api import (
     project_router,
     session_router,
 )
-from fastapi import FastAPI
 
 app = FastAPI(
     title="FastAPI React Pi Integration",
@@ -23,6 +25,15 @@ app = FastAPI(
         "All Pi interactions go through WebSocket RPC."
     ),
     version="0.1.0",
+)
+
+# CORS - allow Vite dev server
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Include API routers

@@ -1,24 +1,54 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../store/AppContext';
-import { mockFolders } from '../services/mockData';
+import { listProjects } from '../services/api';
 import './views.css';
 
 export default function FolderSelector() {
   const { setSelectedFolder, setSelectedModel, setView } = useApp();
   const [search, setSearch] = useState('');
+  const [folders, setFolders] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const folders = useMemo(() => mockFolders(), []);
+  useEffect(() => {
+    listProjects()
+      .then((projectNames) => {
+        // Convert project names to full paths (backend returns names, we build paths)
+        // The backend lists subdirectories of ~/Projects, returns just names.
+        // We store them as-is; the path will be constructed when needed.
+        setFolders(projectNames);
+      })
+      .catch((e) => {
+        setError(e instanceof Error ? e.message : 'Failed to load projects');
+      })
+      .finally(() => setLoading(false));
+  }, []);
 
-  const filteredFolders = useMemo(
-    () => folders.filter((f) => f.toLowerCase().includes(search.toLowerCase())),
-    [folders, search]
-  );
+  const filteredFolders = useMemo(() => {
+    if (!search.trim()) return folders;
+    const q = search.toLowerCase();
+    return folders.filter((f) => f.toLowerCase().includes(q));
+  }, [folders, search]);
 
-  const handleOpen = (folder: string) => {
-    setSelectedFolder(folder);
+  const handleOpen = (folderName: string) => {
+    // Store the folder name (backend resolves ~/Projects/{name})
+    setSelectedFolder(folderName);
     setSelectedModel(null);
     setView('models');
   };
+
+  if (loading) {
+    return (
+      <div className="view-folder">
+        <div className="view-folder__inner">
+          <div className="view-folder__header">
+            <h1>Open Project</h1>
+            <p className="view-folder__subtitle">Loading projects...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="view-folder">
@@ -42,8 +72,9 @@ export default function FolderSelector() {
         </div>
 
         <div className="view-folder__list">
-          {filteredFolders.length === 0 && (
-            <p className="view-folder__empty">No folders found matching &ldquo;{search}&rdquo;</p>
+          {error && <p className="view-folder__empty" style={{ color: '#e85d75' }}>{error}</p>}
+          {filteredFolders.length === 0 && !error && (
+            <p className="view-folder__empty">No projects found under ~/Projects</p>
           )}
           {filteredFolders.map((folder) => (
             <div key={folder} className="view-folder__item">
@@ -53,8 +84,7 @@ export default function FolderSelector() {
                 </svg>
               </div>
               <div className="view-folder__item-content">
-                <div className="view-folder__item-name">{folder.split('/').filter(Boolean).pop()}</div>
-                <div className="view-folder__item-path">{folder}</div>
+                <div className="view-folder__item-name">{folder}</div>
               </div>
               <button className="view-folder__open-btn" onClick={() => handleOpen(folder)}>
                 Open

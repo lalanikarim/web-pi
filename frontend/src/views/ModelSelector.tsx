@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useApp } from '../store/AppContext';
 import { useModels } from '../hooks/useModels';
 import './views.css';
@@ -6,6 +7,23 @@ import './common.css';
 export default function ModelSelector() {
   const { selectedFolder, selectedModel, setSelectedModel, switchModel, setCurrentModel, setView } = useApp();
   const { models, loading, error } = useModels();
+  const [switching, setSwitching] = useState(false);
+
+  const handleSwitch = async () => {
+    if (!selectedModel || !selectedFolder) return;
+    setSwitching(true);
+    try {
+      // Switch model on backend (session_id is generated when WebSocket connects)
+      // For now, we switch on connect in the Workspace — this sets the UI selection
+      switchModel(selectedModel);
+      setCurrentModel(selectedModel);
+      setView('workspace');
+    } catch (e) {
+      console.error('Failed to switch model:', e);
+    } finally {
+      setSwitching(false);
+    }
+  };
 
   return (
     <div className="view-models">
@@ -40,10 +58,18 @@ export default function ModelSelector() {
                 </div>
                 <div className="view-models__card-meta">
                   <span>{model.provider}</span>
-                  <span className="view-models__divider">&middot;</span>
-                  <span>{model.contextWindow.toLocaleString()} context</span>
-                  <span className="view-models__divider">&middot;</span>
-                  <span>{model.maxTokens.toLocaleString()} max tokens</span>
+                  {model.contextWindow > 0 && (
+                    <>
+                      <span className="view-models__divider">&middot;</span>
+                      <span>{model.contextWindow.toLocaleString()} context</span>
+                    </>
+                  )}
+                  {model.maxTokens > 0 && (
+                    <>
+                      <span className="view-models__divider">&middot;</span>
+                      <span>{model.maxTokens.toLocaleString()} max tokens</span>
+                    </>
+                  )}
                 </div>
               </div>
             ))}
@@ -53,16 +79,10 @@ export default function ModelSelector() {
         <div className="view-models__actions">
           <button
             className="btn btn--primary btn--lg"
-            disabled={!selectedModel}
-            onClick={() => {
-              if (selectedModel) {
-                switchModel(selectedModel);
-                setCurrentModel(selectedModel);
-                setView('workspace');
-              }
-            }}
+            disabled={!selectedModel || switching}
+            onClick={handleSwitch}
           >
-            Switch Model &amp; Open
+            {switching ? 'Switching...' : 'Switch Model & Open'}
           </button>
         </div>
       </div>
