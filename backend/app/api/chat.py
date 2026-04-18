@@ -14,7 +14,7 @@ import asyncio
 import json
 import uuid
 from pathlib import Path
-from typing import List, Optional
+from typing import Callable, List, Optional
 
 from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
 
@@ -27,6 +27,49 @@ router = APIRouter()
 active_rpc_processes: dict = {}
 # session_id -> WebSocket
 active_websockets: dict = {}
+
+
+# ---------------------------------------------------------------------------
+# Shared stdout reader
+# ---------------------------------------------------------------------------
+
+
+async def _read_stdout_loop(
+    stdout,
+    on_json: Callable,
+    on_raw: Callable | None = None,
+) -> None:
+    """Async loop that reads JSON lines from stdout and yields them.
+
+    Args:
+        stdout: asyncio subprocess stdout StreamReader
+        on_json: callback(data) for valid JSON lines
+        on_raw: callback(raw_str) for non-JSON lines (optional)
+    """
+    try:
+        while True:
+            line = await stdout.readline()
+            if not line:
+                break
+
+            decoded = line.decode().strip()
+            if not decoded:
+                continue
+
+            try:
+                data = json.loads(decoded)
+            except json.JSONDecodeError:
+                if on_raw:
+                    on_raw(decoded)
+                continue
+
+            if isinstance(data, dict):
+                await on_json(data)
+            else:
+                if on_raw:
+                    on_raw(data)
+    except asyncio.CancelledError:
+        pass
 
 
 # ---------------------------------------------------------------------------
