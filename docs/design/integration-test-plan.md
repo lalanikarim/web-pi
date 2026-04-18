@@ -28,10 +28,16 @@ web-pi-integration-tests/
 
 ### Model Configuration
 
-| Field | Value |
-|-------|-------|
-| Provider | `vllm` |
-| Model ID | `Qwen/Qwen3.6-35B-A3B` |
+Model is configurable via environment variable or CLI flag:
+
+| Source | Variable | Default |
+|--------|----------|---------|
+| Environment | `TEST_MODEL_ID` | `Qwen/Qwen3.6-35B-A3B` |
+| Environment | `TEST_MODEL_PROVIDER` | `vllm` |
+| CLI flag | `--model-id` | `Qwen/Qwen3.6-35B-A3B` |
+| CLI flag | `--model-provider` | `vllm` |
+
+**Strict model requirement:** The specified model **must be available** from `pi --mode rpc get_available_models`. If not found, the test suite exits immediately with code 1 — no fallback models, no skipped tests, no partial runs.
 
 This model is used throughout all chat prompts and model-switching tests.
 
@@ -93,8 +99,7 @@ class Tc:
 ### T1.5 — List models (with session)
 
 - **Request:** `GET /api/models/?session_id=<session_id>`
-- **Verify:** Returns list including `Qwen/Qwen3.6-35B-A3B` from provider `vllm`
-- **Note:** If vllm not configured, test skips with "model not available"
+- **Verify:** Returns list including `TEST_MODEL_ID` from provider `vllm`
 
 ### T1.6 — Get project info (after session creation)
 
@@ -239,11 +244,11 @@ class Tc:
   - Body: `{model_id: "Qwen/Qwen3.6-35B-A3B", name: "ModelSwitch-Test"}`
 - **Verify:** `model_id == "Qwen/Qwen3.6-35B-A3B"`
 
-### T4.2 — Switch to model B (fallback)
+### T4.2 — Switch to second available model
 
-- **Request:** `POST /api/projects/<id>/model?model_id=claude-sonnet-4-20250514&provider=anthropic`
+- **Request:** `POST /api/projects/<id>/model?model_id=<second_model>&provider=<provider>`
+  - `<second_model>` = first other model returned by `get_available_models` (any provider)
 - **Verify:** Returns `200`, updated `SessionRecord` with new `model_id`
-- **Note:** May fail if model not available — test records as "skipped: model not available"
 
 ### T4.3 — Chat with switched model
 
@@ -370,14 +375,22 @@ Teardown
 
 ---
 
-## Model Availability Handling
+## Model Availability Enforcement
 
-If `Qwen/Qwen3.6-35B-A3B` via `vllm` is **not available** in the test environment:
+**No fallbacks. No skips. No partial runs.**
 
-1. **T1.4, T1.5, T3.1, T4.1** — Skip with "model not available" (mark as `⏭`)
-2. **T1.9, T1.10** — Still test chat with any available model
-3. **T4.1–T4.4** — Model switch tests become validation that the API accepts the request and updates the record
-4. **Fallback model:** If no vllm model available, test with first model from `get_available_models`
+At startup, the test suite validates the model against `pi --mode rpc get_available_models`:
+
+```python
+AVAILABLE = await get_available_models()  # via SessionManager
+model_ids = {m.id for m in AVAILABLE}
+if TEST_MODEL_ID not in model_ids:
+    print(f"✗ Required model '{TEST_MODEL_ID}' (provider: {TEST_MODEL_PROVIDER}) not found")
+    print(f"  Available: {', '.join(sorted(model_ids))}")
+    sys.exit(1)
+```
+
+All subsequent tests assume the model is available. If any test fails because the model is unavailable, the suite has already exited before reaching it.
 
 ---
 
