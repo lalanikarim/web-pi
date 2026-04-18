@@ -113,10 +113,12 @@ class Tc:
 - **Request:** `GET /api/projects/info?project_path=$HOME/Projects/web-pi-integration-tests`
 - **Verify:** `running_count == 1`, `sessions` contains session from T1.4
 
-### T1.7 — WebSocket connect
+### T1.7 — WebSocket connect (auto-sends set_model)
 
 - **Connect:** `WS /api/projects/ws?session_id=<session_id>`
 - **Verify:** Connection succeeds, state becomes `connected`
+- **Verify:** WS relay sends `set_model` with `modelId="Qwen/Qwen3.6-35B-A3B"` to process stdin (logged or captured)
+- **Verify:** Receive `"response"` for the `set_model` command
 
 ### T1.8 — Send `get_state` via WS
 
@@ -264,8 +266,10 @@ class Tc:
 
 ### T4.3 — Chat with switched model
 
-- **If T4.2 ran:** Connect WS to session, send `{"type":"prompt","message":"What model are you?"}`
-  - **Verify:** Response reflects the new model (`Qwen 3.5 27B` or whichever model was switched to)
+- **If T4.2 ran:**
+  - **WS:** Connect to session, verify `set_model` command is auto-sent with `modelId="Qwen 3.5 27B"` in WS traffic
+  - Send `"What model are you?"` via WS
+  - **Verify:** Response reflects the new model (`Qwen 3.5 27B`)
 - **If T4.2 skipped:** No test action (model didn't change)
 
 ### T4.4 — Chat on original model (recreate)
