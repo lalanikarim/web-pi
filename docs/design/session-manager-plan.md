@@ -1,5 +1,7 @@
 # Session Manager — Implementation Plan
 
+> **STATUS: Fully implemented as of commit 83bd05a.** All phases complete.
+
 > One `pi --mode rpc` process per **session**. Sessions persist independently of WebSocket connections. Users create multiple sessions per project, choose the model at creation, and explicitly close/delete when done.
 
 ---
