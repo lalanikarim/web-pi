@@ -51,7 +51,7 @@ FastAPI backend + React (TypeScript) frontend for the Pi coding agent.
 
 ```bash
 cd backend
-uv run python app/main.py        # Starts on :8000
+uv run uvicorn app.main:app --reload  # Starts on :8000 with auto-reload
 # Docs auto-generated at :8000/docs
 ```
 
