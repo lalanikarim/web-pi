@@ -9,6 +9,27 @@ from typing import AsyncGenerator
 import httpx
 import pytest
 
+
+class TestResult:
+    """Simple test result tracker used by integration flow tests."""
+
+    def __init__(self) -> None:
+        self.failed: int = 0
+        self.skipped: int = 0
+        self.failures: list[str] = []
+
+    def check(self, condition: bool, message: str) -> None:
+        if not condition:
+            self.failed += 1
+            self.failures.append(f"FAIL: {message}")
+
+
+@pytest.fixture
+def result() -> TestResult:
+    """Provide a TestResult object for tracking check/assertions."""
+    return TestResult()
+
+
 # ── Config (env-overridable) ─────────────────────────────────────────────────
 
 API_BASE = os.environ.get("API_BASE", "http://127.0.0.1:8765")
@@ -56,10 +77,17 @@ def test_model2_id() -> str:
 
 
 @pytest.fixture
+async def client(timeout: float) -> AsyncGenerator[httpx.AsyncClient, None]:
+    """Provide an httpx.AsyncClient (alias: client), auto-closed after test."""
+    async with httpx.AsyncClient(timeout=timeout) as c:
+        yield c
+
+
+@pytest.fixture
 async def async_client(timeout: float) -> AsyncGenerator[httpx.AsyncClient, None]:
     """Provide an httpx.AsyncClient, auto-closed after test."""
-    async with httpx.AsyncClient(timeout=timeout) as client:
-        yield client
+    async with httpx.AsyncClient(timeout=timeout) as c:
+        yield c
 
 
 # ── Pytest hooks ─────────────────────────────────────────────────────────────

@@ -54,7 +54,7 @@ async def ws_endpoint(websocket: WebSocket, session_id: str = Query(...)) -> Non
         session_id: the session to connect to
     """
     # Validate session exists and is running
-    ok = session_manager.connect_ws(session_id, str(websocket))
+    ok = await session_manager.connect_ws(session_id, str(websocket))
     if not ok:
         record = session_manager.get_session(session_id)
         reason = "Session not found" if not record else f"Session is {record.status} (not running)"
@@ -82,7 +82,7 @@ async def ws_endpoint(websocket: WebSocket, session_id: str = Query(...)) -> Non
     except Exception as exc:
         logger.error("WebSocket error for session %s: %s", session_id, exc, exc_info=True)
     finally:
-        session_manager.disconnect_ws(session_id, str(websocket))
+        await session_manager.disconnect_ws(session_id, str(websocket))
 
 
 # ---------------------------------------------------------------------------

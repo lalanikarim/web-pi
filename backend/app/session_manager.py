@@ -199,9 +199,7 @@ class SessionManager:
     async def _wait_for_ready(self, record: SessionRecord) -> dict:
         """Send get_available_models, wait for response, then set model & name."""
         # 1. Get available models (confirms RPC is alive)
-        ready_resp = await self._send_command_internal(
-            record, {"type": "get_available_models"}, timeout=30.0
-        )
+        ready_resp = await self._send_command_internal(record, {"type": "get_available_models"})
         logger.info("Session %s RPC ready: %s", record.session_id, ready_resp)
 
         # 2. Set model
@@ -212,14 +210,12 @@ class SessionManager:
                 "provider": self._extract_provider(record.model_id),
                 "modelId": record.model_id,
             },
-            timeout=15.0,
         )
 
         # 3. Set session name
         await self._send_command_internal(
             record,
             {"type": "set_session_name", "name": record.name},
-            timeout=15.0,
         )
 
         return ready_resp
@@ -242,7 +238,7 @@ class SessionManager:
         compacted = False
         try:
             # Compact
-            await self._send_command_internal(record, {"type": "compact"}, timeout=60.0)
+            await self._send_command_internal(record, {"type": "compact"})
             compacted = True
             logger.info("Session %s compacted", session_id)
         except asyncio.TimeoutError:
@@ -303,31 +299,23 @@ class SessionManager:
     # WebSocket management
     # ------------------------------------------------------------------
 
-    def connect_ws(self, session_id: str, websocket_id: str) -> bool:
+    async def connect_ws(self, session_id: str, websocket_id: str) -> bool:
         """Mark a session as having an active WebSocket. Returns False if not found/running."""
+        async with self._lock:
+            record = self._sessions.get(session_id)
+            if not record or record.status != "running":
+                return False
+            record.ws_session_id = websocket_id
+            record.ws_connected = True
+            return True
 
-        async def _do():
-            async with self._lock:
-                record = self._sessions.get(session_id)
-                if not record or record.status != "running":
-                    return False
-                record.ws_session_id = websocket_id
-                record.ws_connected = True
-                return True
-
-        return asyncio.get_event_loop().run_until_complete(_do())
-
-    def disconnect_ws(self, session_id: str, websocket_id: str) -> None:
+    async def disconnect_ws(self, session_id: str, websocket_id: str) -> None:
         """Clear WebSocket tracking (only if this specific websocket_id)."""
-
-        async def _do():
-            async with self._lock:
-                record = self._sessions.get(session_id)
-                if record and record.ws_session_id == websocket_id:
-                    record.ws_session_id = None
-                    record.ws_connected = False
-
-        asyncio.get_event_loop().run_until_complete(_do())
+        async with self._lock:
+            record = self._sessions.get(session_id)
+            if record and record.ws_session_id == websocket_id:
+                record.ws_session_id = None
+                record.ws_connected = False
 
     # ------------------------------------------------------------------
     # Query
@@ -374,7 +362,7 @@ class SessionManager:
     # ------------------------------------------------------------------
 
     async def _send_command_internal(
-        self, record: SessionRecord, command: dict, timeout: float = 30.0
+        self, record: SessionRecord, command: dict, timeout: float | None = None
     ) -> dict:
         """Send a command and wait for the matching response. Raises on timeout."""
         req_id = command.get("id") or str(uuid.uuid4())
@@ -393,7 +381,10 @@ class SessionManager:
             raise RuntimeError(f"Session {record.session_id} process pipe broken: {exc}") from exc
 
         try:
-            result = await asyncio.wait_for(future, timeout=timeout)
+            if timeout is not None:
+                result = await asyncio.wait_for(future, timeout=timeout)
+            else:
+                result = await future
             return result
         except asyncio.TimeoutError:
             record.pending_requests.pop(req_id, None)

@@ -180,7 +180,7 @@ async def main(flows: Sequence[str] | None = None) -> None:
 
     results: list[FlowResult] = []
     for flow_name in modules_to_run:
-        mod_name = f"test_{flow_name}"
+        mod_name = flow_name if flow_name.startswith("test_") else f"test_{flow_name}"
         result = FlowResult(flow_name)
         result = await run_flow(_import_flow(mod_name), result)
         results.append(result)

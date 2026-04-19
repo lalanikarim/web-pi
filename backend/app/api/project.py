@@ -13,7 +13,7 @@ from fastapi import APIRouter, HTTPException, Query
 from ..schemas import SessionCreateRequest
 from ..session_manager import SessionRecord, session_manager
 
-router = APIRouter()
+router = APIRouter(redirect_slashes=False)
 
 
 # ---------------------------------------------------------------------------
@@ -93,6 +93,7 @@ async def get_project_info(
 
 
 @router.post("", response_model=SessionRecord)
+@router.post("/", response_model=SessionRecord, include_in_schema=False)
 async def create_session(
     req: SessionCreateRequest,
     project_path: str = Query(..., description="Absolute path to the project directory"),

@@ -69,6 +69,7 @@ class FileInfo(BaseModel):
     File information.
     """
 
+    name: str
     path: str
     isDirectory: bool
     size: Optional[int] = None

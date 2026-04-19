@@ -16,8 +16,8 @@ import websockets  # type: ignore[import-untyped]
 
 # ── Constants ────────────────────────────────────────────────────────────────
 
-API_BASE = "http://127.0.0.1:8765"
-WS_BASE = "ws://127.0.0.1:8765"
+API_BASE = os.environ.get("API_BASE", "http://127.0.0.1:8765")
+WS_BASE = os.environ.get("WS_BASE", "ws://127.0.0.1:8765")
 TIMEOUT = 30.0
 WS_TIMEOUT = 10.0
 TESTS_DIR = Path(

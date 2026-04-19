@@ -10,6 +10,7 @@ dependencies = [
     "pydantic>=2.8.0",
     "httpx>=0.28.1",
     "pytest>=9.0.3",
+    "pytest-asyncio>=1.0.0",
     "websockets",
 ]
 
@@ -25,6 +26,9 @@ run-tests = "integration_test_harness:main"
 [tool.ruff]
 line-length = 100
 target-version = "py313"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
 
 [tool.ty]
 target-version = "3.13"
