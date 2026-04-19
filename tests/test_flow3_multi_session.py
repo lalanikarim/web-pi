@@ -113,7 +113,7 @@ async def test_independent_chat(client, result, session1_id, session2_id):
         ws1, {"type": "prompt", "message": "Session 1, identify yourself. Say 'I am session 1'."}
     )
     events1 = await ws_collect(ws1)
-    ws1.close()
+    await ws1.close()
 
     if events1:
         result.check(True, f"Session 1 responded: {len(events1)} events")
@@ -127,7 +127,7 @@ async def test_independent_chat(client, result, session1_id, session2_id):
         ws2, {"type": "prompt", "message": "Session 2, identify yourself. Say 'I am session 2'."}
     )
     events2 = await ws_collect(ws2)
-    ws2.close()
+    await ws2.close()
 
     if events2:
         result.check(True, f"Session 2 responded: {len(events2)} events")
@@ -220,5 +220,3 @@ async def run(result):
         await test_close_session1(client, result, session1)
         await test_delete_session2(client, result, session2)
         await test_project_info_clean(client, result)
-
-

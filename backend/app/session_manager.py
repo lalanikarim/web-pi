@@ -87,21 +87,18 @@ class SessionRecord(BaseModel):
     model_id: str
     status: str = "creating"  # creating | running | closing | stopped
     pid: Optional[int] = None
-    process: Any = None  # asyncio.subprocess.Process
-    stdin: Any = None
-    stdout: Any = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     ws_session_id: Optional[str] = None
     ws_connected: bool = False
 
-    # RPC request/response plumbing
-    pending_requests: dict[str, asyncio.Future] = Field(default_factory=dict)
-    # Events queued for the current WebSocket relay
-    event_buffer: asyncio.Queue = Field(default_factory=asyncio.Queue)
-    # Background stdout reader task
-    stdout_task: Optional[asyncio.Task] = None
-    # WS→stdin messages (lazy-initialized by WS relay)
-    ws_to_stdin_queue: Optional[asyncio.Queue] = None
+    # Runtime-only fields — excluded from JSON serialization
+    process: Any = Field(default=None, exclude=True)  # noqa: ANN401
+    stdin: Any = Field(default=None, exclude=True)  # noqa: ANN401
+    stdout: Any = Field(default=None, exclude=True)  # noqa: ANN401
+    stdout_task: Optional[asyncio.Task] = Field(default=None, exclude=True)  # noqa: ANN401
+    ws_to_stdin_queue: Optional[asyncio.Queue] = Field(default=None, exclude=True)  # noqa: ANN401
+    pending_requests: dict[str, asyncio.Future] = Field(default_factory=dict, exclude=True)  # noqa: ANN401
+    event_buffer: asyncio.Queue = Field(default_factory=asyncio.Queue, exclude=True)  # noqa: ANN401
 
 
 # ---------------------------------------------------------------------------
@@ -240,8 +237,8 @@ class SessionManager:
 
         compacted = False
         try:
-            # Compact
-            await self._send_command_internal(record, {"type": "compact"})
+            # Compact with a 5s timeout — don't block forever if Pi doesn't respond
+            await self._send_command_internal(record, {"type": "compact"}, timeout=5.0)
             compacted = True
             logger.info("Session %s compacted", session_id)
         except asyncio.TimeoutError:
@@ -268,7 +265,7 @@ class SessionManager:
     # Model switch
     # ------------------------------------------------------------------
 
-    def switch_model(
+    async def switch_model(
         self, session_id: str, model_id: str, provider: str | None = None
     ) -> SessionRecord | None:
         """Update the model metadata for a session.
@@ -277,26 +274,18 @@ class SessionManager:
         set_model RPC command is sent over WebSocket when the client connects
         (ensuring all Pi actions go through WS, never direct HTTP→stdin).
         """
+        async with self._lock:
+            record = self._sessions.get(session_id)
+            if not record or record.status != "running":
+                return None
+            record.model_id = model_id
+            return record
 
-        async def _do() -> SessionRecord | None:
-            async with self._lock:
-                record = self._sessions.get(session_id)
-                if not record or record.status != "running":
-                    return None
-                record.model_id = model_id
-                return record
-
-        return asyncio.get_event_loop().run_until_complete(_do())
-
-    def get_model_id(self, session_id: str) -> str | None:
+    async def get_model_id(self, session_id: str) -> str | None:
         """Get the configured model_id for a session (used by WS on connect)."""
-
-        async def _do():
-            async with self._lock:
-                record = self._sessions.get(session_id)
-                return record.model_id if record else None
-
-        return asyncio.get_event_loop().run_until_complete(_do())
+        async with self._lock:
+            record = self._sessions.get(session_id)
+            return record.model_id if record else None
 
     # ------------------------------------------------------------------
     # WebSocket management

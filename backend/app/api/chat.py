@@ -64,7 +64,7 @@ async def ws_endpoint(websocket: WebSocket, session_id: str = Query(...)) -> Non
     await websocket.accept()
 
     # Send set_model to the RPC process (all Pi actions go through WS)
-    model_id = session_manager.get_model_id(session_id)
+    model_id = await session_manager.get_model_id(session_id)
     if model_id:
         await _write_stdin(
             session_id,

@@ -11,7 +11,7 @@ pi --rpc processes. These endpoints provide the REST surface for:
 from fastapi import APIRouter, HTTPException, Query
 
 from ..schemas import SessionCloseResponse
-from ..session_manager import SessionRecord, session_manager
+from ..session_manager import session_manager
 
 router = APIRouter()
 
@@ -21,8 +21,8 @@ router = APIRouter()
 # ---------------------------------------------------------------------------
 
 
-@router.post("/{session_id}/close", response_model=SessionCloseResponse)
-async def close_session(session_id: str) -> SessionCloseResponse:
+@router.post("/{session_id}/close")
+async def close_session(session_id: str) -> dict:
     """
     Close a session: compact → abort → terminate process → remove record.
 
@@ -41,8 +41,8 @@ async def close_session(session_id: str) -> SessionCloseResponse:
 # ---------------------------------------------------------------------------
 
 
-@router.post("/{session_id}/delete", response_model=SessionCloseResponse)
-async def delete_session(session_id: str) -> SessionCloseResponse:
+@router.post("/{session_id}/delete")
+async def delete_session(session_id: str) -> dict:
     """
     Delete a session: abort → terminate process → remove record.
 
@@ -61,20 +61,20 @@ async def delete_session(session_id: str) -> SessionCloseResponse:
 # ---------------------------------------------------------------------------
 
 
-@router.post("/{session_id}/model", response_model=SessionRecord)
+@router.post("/{session_id}/model", response_model=SessionCloseResponse)
 async def switch_model(
     session_id: str,
     model_id: str = Query(..., description="Model ID to switch to"),
     provider: str | None = Query(None, description="Provider (e.g. 'anthropic', 'openai')"),
-) -> SessionRecord:
+) -> SessionCloseResponse:
     """Update the session's model metadata.
 
     The actual set_model RPC command is sent over WebSocket when the client
     connects. This endpoint only records the desired model in the session record.
     """
-    result = session_manager.switch_model(session_id, model_id, provider)
+    result = await session_manager.switch_model(session_id, model_id, provider)
     if not result:
         raise HTTPException(
             status_code=404, detail=f"Session {session_id} not found or not running"
         )
-    return result
+    return SessionCloseResponse(session_id=session_id, compacted=False)
