@@ -5,7 +5,7 @@ All Phase 1–3 cleanup items from the original plan are complete. Test suite is
 ## Summary
 
 - **pytest infrastructure**: `conftest.py` with fixtures, subfixture support, `test_utils.py` with shared helpers
-- **73 tests passing** across flows 1–4, 5–6
+- **76 tests passing** across flows 1–7
 - **Run**: `API_BASE=http://127.0.0.1:8000 WS_BASE=ws://127.0.0.1:8000 uv run pytest -v`
 - **Harness**: `uv run run-tests` (CLI entry point from `pyproject.toml`)
 
@@ -45,11 +45,14 @@ All Phase 1–3 cleanup items from the original plan are complete. Test suite is
   - T6.5a: Read non-existent file → 404
   - T6.5b: Duplicate session names → allowed (unique IDs)
   - T6.5c: Browse non-existent directory → 200 with empty list
+- [x] Flow 7 rewritten: pytest-compatible (3 tests, all passing)
+  - T7.1a: Find uvicorn process by port (lsof/ss/fuser fallback)
+  - T7.1b: Create 2 sessions, verify both running with alive PIDs
+  - T7.1c: Send SIGTERM, verify all pi --rpc processes terminated
+  - Cross-platform port extraction from API_BASE URL
 
 ## Pending Test Flows
 
-| Flow | File | Tests | Status |
-|------|------|-------|--------|
-| 7: Shutdown | `test_flow7_shutdown_cleanup.py` | — | ⏳ Not written |
+All flows 1–7 complete.
 
-See `docs/design/integration-test-plan.md` for detailed test specifications for flows 4–7.
+See `docs/design/integration-test-plan.md` for detailed test specifications.
