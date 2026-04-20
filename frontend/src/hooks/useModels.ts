@@ -96,13 +96,22 @@ export function useModels(projectPath?: string | null): UseModelsResult {
 				try {
 					const resp = await listModels(activeSessionId!);
 					if (resp && resp.length > 0) {
-						const mapped: Model[] = resp.map((m) => ({
-							id: m.id,
-							name: deriveModelName(m.id, m.provider),
-							provider: m.provider,
-							contextWindow: m.contextWindow || 0,
-							maxTokens: m.maxTokens || 0,
-						}));
+						// Deduplicate by provider:id composite key
+						const seen = new Set<string>();
+						const mapped: Model[] = [];
+						for (const m of resp) {
+							const key = `${m.provider}:${m.id}`;
+							if (!seen.has(key)) {
+								seen.add(key);
+								mapped.push({
+									id: m.id,
+									name: deriveModelName(m.id, m.provider),
+									provider: m.provider,
+									contextWindow: m.contextWindow || 0,
+									maxTokens: m.maxTokens || 0,
+								});
+							}
+						}
 						if (!abortControllerRef.current?.signal.aborted) {
 							setModels(mapped);
 							setError(null);
