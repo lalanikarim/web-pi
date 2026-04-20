@@ -88,6 +88,8 @@ export interface UseWebSocketReturn {
 	state: ConnectionState;
 	/** Send a message to Pi (plain text or structured) */
 	send: (data: OutboundMessage) => void;
+	/** Abort current Pi turn without terminating session */
+	abort: () => void;
 	/** List of inbound messages (rpc_events, extension_ui_requests, etc.) */
 	messages: InboundMessage[];
 	/** Extension UI request currently awaiting user input */
@@ -310,9 +312,16 @@ export function useWebSocket(
 		send({ type: "get_messages" });
 	}, [send]);
 
+	// ── Abort helper ──────────────────────────────────────────────────────
+
+	const abort = useCallback(() => {
+		send({ type: "abort" });
+	}, [send]);
+
 	return {
 		state,
 		send,
+		abort,
 		messages,
 		pendingUiRequest,
 		respondToUi,

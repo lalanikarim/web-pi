@@ -73,6 +73,8 @@ export default function ChatPanel() {
 	// ── Streaming state ─────────────────────────────────────────────────────
 	const [streamingContent, setStreamingContent] = useState("");
 	const [toolCallNames, setToolCallNames] = useState<string[]>([]);
+	const isStreaming =
+		streamingContent.trim().length > 0 || toolCallNames.length > 0;
 
 	// ── Input state ──────────────────────────────────────────────────────────
 	const [input, setInput] = useState("");
@@ -482,17 +484,29 @@ export default function ChatPanel() {
 					value={input}
 					onChange={(e) => setInput(e.target.value)}
 					onKeyDown={handleKeyDown}
-					disabled={ws.state !== "connected"}
+					disabled={ws.state !== "connected" || isStreaming}
 				/>
-				<button
-					className="btn btn--send"
-					onClick={handleSend}
-					disabled={!input.trim() || ws.state !== "connected"}
-				>
-					<svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
-						<path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
-					</svg>
-				</button>
+				{isStreaming ? (
+					<button
+						className="btn btn--abort"
+						onClick={() => ws.abort()}
+						title="Abort current turn"
+					>
+						<svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+							<rect x="6" y="6" width="12" height="12" rx="2" />
+						</svg>
+					</button>
+				) : (
+					<button
+						className="btn btn--send"
+						onClick={handleSend}
+						disabled={!input.trim() || ws.state !== "connected"}
+					>
+						<svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+							<path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+						</svg>
+					</button>
+				)}
 			</div>
 		</div>
 	);
