@@ -10,7 +10,6 @@ pi --rpc processes. These endpoints provide the REST surface for:
 
 from fastapi import APIRouter, HTTPException, Query
 
-from ..schemas import SessionCloseResponse
 from ..session_manager import session_manager
 
 router = APIRouter()
@@ -61,12 +60,12 @@ async def delete_session(session_id: str) -> dict:
 # ---------------------------------------------------------------------------
 
 
-@router.post("/{session_id}/model", response_model=SessionCloseResponse)
+@router.post("/{session_id}/model")
 async def switch_model(
     session_id: str,
     model_id: str = Query(..., description="Model ID to switch to"),
     provider: str | None = Query(None, description="Provider (e.g. 'anthropic', 'openai')"),
-) -> SessionCloseResponse:
+) -> dict:
     """Update the session's model metadata.
 
     The actual set_model RPC command is sent over WebSocket when the client
@@ -77,4 +76,4 @@ async def switch_model(
         raise HTTPException(
             status_code=404, detail=f"Session {session_id} not found or not running"
         )
-    return SessionCloseResponse(session_id=session_id, compacted=False)
+    return {"message": "Model switched", "modelId": model_id, "provider": provider or ""}

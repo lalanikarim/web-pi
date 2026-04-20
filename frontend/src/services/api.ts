@@ -135,6 +135,25 @@ export async function listModels(sessionId?: string): Promise<ModelConfig[]> {
 	return request<ModelConfig[]>(`/api/models/${qs}`);
 }
 
+/**
+ * Switch model for a session (updates session metadata).
+ * The actual set_model RPC is sent via WebSocket on next connect.
+ */
+export interface ModelSwitchResponse {
+	message: string;
+	modelId: string;
+	provider: string;
+}
+
+export async function switchModel(
+	sessionId: string,
+	modelId: string,
+	provider: string = "",
+): Promise<ModelSwitchResponse> {
+	const qs = `?model_id=${encodeURIComponent(modelId)}&provider=${encodeURIComponent(provider)}`;
+	return request<ModelSwitchResponse>(`/api/projects/${sessionId}/model${qs}`);
+}
+
 // ---------------------------------------------------------------------------
 // Files
 // ---------------------------------------------------------------------------
