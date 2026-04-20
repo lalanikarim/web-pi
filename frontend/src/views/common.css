@@ -145,3 +145,40 @@
 	font-size: 12px;
 	color: #fca5a5;
 }
+
+/* ===== Compact button ===== */
+.btn--compact {
+	background: #0ea5e9;
+	color: #fff;
+	border: 1px solid #0284c7;
+}
+
+.btn--compact:hover:not(:disabled) {
+	background: #0284c7;
+	border-color: #0369a1;
+}
+
+/* ===== Delete button ===== */
+.btn--delete {
+	background: #7f1d1d;
+	color: #fca5a5;
+	border: 1px solid #991b1b;
+}
+
+.btn--delete:hover:not(:disabled) {
+	background: #991b1b;
+	border-color: #b91c1c;
+	color: #fff;
+}
+
+/* ===== Session closing text ===== */
+.session-closing {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 12px;
+	color: #94a3b8;
+	padding: 4px 10px;
+	background: #1e293b;
+	border-radius: 6px;
+}

@@ -155,6 +155,37 @@ export async function switchModel(
 }
 
 // ---------------------------------------------------------------------------
+// Sessions
+// ---------------------------------------------------------------------------
+
+export interface SessionCloseResponse {
+	session_id: string;
+	compacted: boolean;
+}
+
+/**
+ * Close a session: compact conversation then terminate process.
+ */
+export async function closeSession(
+	sessionId: string,
+): Promise<SessionCloseResponse> {
+	return request<SessionCloseResponse>(`/api/projects/${sessionId}/close`, {
+		method: "POST",
+	});
+}
+
+/**
+ * Delete a session: abort current turn then terminate process (no compact).
+ */
+export async function deleteSession(
+	sessionId: string,
+): Promise<SessionCloseResponse> {
+	return request<SessionCloseResponse>(`/api/projects/${sessionId}/delete`, {
+		method: "POST",
+	});
+}
+
+// ---------------------------------------------------------------------------
 // Files
 // ---------------------------------------------------------------------------
 
