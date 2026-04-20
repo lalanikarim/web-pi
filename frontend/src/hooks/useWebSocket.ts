@@ -204,7 +204,6 @@ export function useWebSocket(
 
 	// ── Connect helper (defined before lifecycle so it's hoisted by ref) ───
 
-	// eslint-disable-next-line react-hooks/immutability
 	const doConnect = useCallback(() => {
 		if (disposedRef.current) return;
 
@@ -216,9 +215,9 @@ export function useWebSocket(
 
 		setState("connecting");
 
-		// Connect directly to the backend. In dev mode Vite runs on :5173
-		// and the backend on :8000 — a relative path would go to :5173 which
-		// has no WebSocket endpoint. Use absolute URL in dev, relative in prod.
+		// Connect to the backend. In dev mode Vite runs on :5173
+		// and the backend on :8000 — use absolute URL in dev, relative in prod
+		// (where both share the same origin).
 		const origin = import.meta.env.DEV ? "http://localhost:8000" : "";
 		const wsUrl = `${origin}/api/projects/ws?session_id=${encodeURIComponent(sessionId)}`;
 		const ws = new WebSocket(wsUrl);
@@ -232,7 +231,8 @@ export function useWebSocket(
 			// Send initial get_state to trigger the streaming pipeline
 			send({ type: "get_state" });
 
-			// Send set_model if a model was selected
+			// modelRef.current is read here (not as a useCallback dep)
+			// so changes to currentModel don't trigger reconnection.
 			const model = modelRef.current;
 			if (model) {
 				send({
@@ -310,7 +310,7 @@ export function useWebSocket(
 				}, 2000);
 			}
 		};
-	}, [projectFolder, modelRef, disconnect, send]);
+	}, [projectFolder, sessionId, disconnect, send]);
 
 	// ── Lifecycle ──────────────────────────────────────────────────────────
 
