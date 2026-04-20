@@ -215,11 +215,10 @@ export function useWebSocket(
 
 		setState("connecting");
 
-		// Connect to the backend. In dev mode Vite runs on :5173
-		// and the backend on :8000 — use absolute URL in dev, relative in prod
-		// (where both share the same origin).
-		const origin = import.meta.env.DEV ? "http://localhost:8000" : "";
-		const wsUrl = `${origin}/api/projects/ws?session_id=${encodeURIComponent(sessionId)}`;
+		// Use a relative path so Vite's dev proxy (configured for /api with
+		// ws: true) routes the WebSocket upgrade to the backend at :8000.
+		// In production both frontend and backend share the same origin.
+		const wsUrl = `/api/projects/ws?session_id=${encodeURIComponent(sessionId)}`;
 		const ws = new WebSocket(wsUrl);
 		wsRef.current = ws;
 
