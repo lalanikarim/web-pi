@@ -85,7 +85,6 @@ export async function getProjectInfo(
 // ---------------------------------------------------------------------------
 
 export interface CreateSessionBody {
-	model_id: string;
 	name?: string;
 }
 
@@ -102,17 +101,13 @@ export interface SessionRecord {
 }
 
 /**
- * Create a new session.
- * @param projectPath — full path of the project folder
- * @param modelId — model to use (e.g. "claude-sonnet-4")
- * @param name — optional session name
+ * Create a new session (model is set later via WS `set_model` on connect).
  */
 export async function createSession(
 	projectPath: string,
-	modelId: string,
 	name?: string,
 ): Promise<SessionRecord> {
-	const body: CreateSessionBody = { model_id: modelId, name };
+	const body: CreateSessionBody = { name };
 	return request<SessionRecord>(
 		`/api/projects/?project_path=${encodeURIComponent(projectPath)}`,
 		{ method: "POST", body: JSON.stringify(body) },

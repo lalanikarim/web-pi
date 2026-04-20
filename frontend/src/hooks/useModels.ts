@@ -54,12 +54,11 @@ export function useModels(
 				return;
 			}
 
-			// Step 1: Launch pi RPC session if not already done
+			// Step 1: Launch pi RPC session (model is set later via WS `set_model` on connect)
 			if (!launchedRef.current) {
 				launchedRef.current = true;
 				try {
-					const modelId = selectedModel?.id;
-					const session = await createSession(projectPath, modelId);
+					const session = await createSession(projectPath);
 					setSessionId(session.session_id);
 				} catch {
 					if (!cancelledRef.current) {
