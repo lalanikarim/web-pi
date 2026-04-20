@@ -86,6 +86,12 @@ export type ConnectionState =
 export interface UseWebSocketReturn {
 	/** Current connection state */
 	state: ConnectionState;
+	/** Close code from last WebSocket close event (null if not closed) */
+	closeCode: number | null;
+	/** Close reason from last WebSocket close event (null if not closed) */
+	closeReason: string | null;
+	/** Human-readable error message for the current state */
+	errorMessage: string | null;
 	/** Send a message to Pi (plain text or structured) */
 	send: (data: OutboundMessage) => void;
 	/** Abort current Pi turn without terminating session */
@@ -100,6 +106,8 @@ export interface UseWebSocketReturn {
 	disconnect: () => void;
 	/** Clear message history */
 	clearMessages: () => void;
+	/** Reconnect the WebSocket */
+	reconnect: () => void;
 }
 
 // ── Interactive extension UI methods (need user input) ──────────────────────
@@ -128,6 +136,8 @@ export function useWebSocket(
 	const [messages, setMessages] = useState<InboundMessage[]>([]);
 	const [pendingUiRequest, setPendingUiRequest] =
 		useState<ExtensionUiRequestMessage | null>(null);
+	const [closeCode, setCloseCode] = useState<number | null>(null);
+	const [closeReason, setCloseReason] = useState<string | null>(null);
 
 	// Track whether cleanup has run (to prevent async setState after unmount)
 	const disposedRef = useRef(false);
@@ -270,16 +280,22 @@ export function useWebSocket(
 		ws.onerror = () => {
 			if (disposedRef.current) return;
 			setState("error");
+			setCloseCode(null);
+			setCloseReason("Connection error");
 		};
 
 		ws.onclose = (event) => {
 			if (disposedRef.current) return;
+
+			setCloseCode(event.code);
+			setCloseReason(event.reason || null);
 
 			if (event.code === 1000) {
 				// Clean close
 				setState("disconnected");
 			} else {
 				// Unexpected close — try to reconnect
+				setState("error");
 				reconnectTimerRef.current = setTimeout(() => {
 					if (!disposedRef.current) {
 						doConnectRef.current();
@@ -318,8 +334,35 @@ export function useWebSocket(
 		send({ type: "abort" });
 	}, [send]);
 
+	// ── Reconnect helper ─────────────────────────────────────────────────
+
+	const reconnect = useCallback(() => {
+		setCloseCode(null);
+		setCloseReason(null);
+		if (reconnectTimerRef.current) {
+			clearTimeout(reconnectTimerRef.current);
+			reconnectTimerRef.current = null;
+		}
+		doConnectRef.current();
+	}, []);
+
+	// ── Error message helper ─────────────────────────────────────────────
+
+	const errorMessage: string | null = (() => {
+		if (state === "error") {
+			if (closeCode === 4002)
+				return closeReason || "Session not found or not running";
+			if (closeReason) return closeReason;
+			return "WebSocket connection lost";
+		}
+		return null;
+	})();
+
 	return {
 		state,
+		closeCode,
+		closeReason,
+		errorMessage,
 		send,
 		abort,
 		messages,
@@ -327,5 +370,6 @@ export function useWebSocket(
 		respondToUi,
 		disconnect,
 		clearMessages,
+		reconnect,
 	};
 }
