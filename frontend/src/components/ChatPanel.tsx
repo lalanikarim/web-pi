@@ -93,6 +93,7 @@ function extractToolName(event: Record<string, unknown>): string | null {
 
 function isStreamFinalizer(event: Record<string, unknown>): boolean {
 	if (event.type === "end_turn" || event.type === "end") return true;
+	if (event.type === "agent_end") return true;
 	if (event.status === "done" || event.status === "finished") return true;
 	if (event.type === "response" && event.id) return true;
 	return false;
