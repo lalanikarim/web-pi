@@ -499,3 +499,223 @@
 	font-size: 11px;
 	color: #64748b;
 }
+
+/* ── Clear button ────────────────────────────────────────────────────── */
+
+.btn--clear {
+	background: rgba(100, 116, 139, 0.15);
+	border-color: #475569;
+	color: #94a3b8;
+}
+
+.btn--clear:hover {
+	background: rgba(239, 68, 68, 0.15);
+	border-color: #ef4444;
+	color: #fca5a5;
+}
+
+/* ── Assistant tool calls ────────────────────────────────────────────── */
+
+.assistant-tool-calls {
+	margin-bottom: 8px;
+	border: 1px solid #334155;
+	border-radius: 6px;
+	overflow: hidden;
+}
+
+.assistant-tool-calls__toggle {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 6px 10px;
+	background: #1e293b;
+	border: none;
+	color: #94a3b8;
+	font-size: 12px;
+	cursor: pointer;
+	width: 100%;
+	text-align: left;
+	font-family: inherit;
+}
+
+.assistant-tool-calls__toggle:hover {
+	background: #263548;
+}
+
+/* ── Tool call collapsible ───────────────────────────────────────────── */
+
+.tool-call-collapsible {
+	border-top: 1px solid #334155;
+}
+
+.tool-call-collapsible__summary {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 6px 10px;
+	font-size: 12px;
+	font-family: inherit;
+	color: #cbd5e1;
+	cursor: pointer;
+	list-style: none;
+}
+
+.tool-call-collapsible__summary::-webkit-details-marker {
+	display: none;
+}
+
+.tool-call-collapsible__summary:hover {
+	background: #1e293b;
+}
+
+.tool-call-collapsible__icon {
+	font-size: 10px;
+	transition: transform 0.15s;
+	width: 12px;
+}
+
+.tool-call-collapsible__name {
+	font-family: "SF Mono", "Fira Code", monospace;
+	font-size: 12px;
+	color: #60a5fa;
+}
+
+.tool-call-collapsible__tag {
+	padding: 1px 6px;
+	border-radius: 4px;
+	font-size: 10px;
+	background: rgba(100, 116, 139, 0.2);
+	color: #94a3b8;
+}
+
+.tool-call-collapsible__tag--result {
+	background: rgba(34, 197, 94, 0.15);
+	color: #86efac;
+}
+
+.tool-call-collapsible__body {
+	padding: 8px 10px 10px 28px;
+}
+
+.tool-call-collapsible__section {
+	margin-bottom: 8px;
+}
+
+.tool-call-collapsible__section:last-child {
+	margin-bottom: 0;
+}
+
+.tool-call-collapsible__label {
+	font-size: 10px;
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+	color: #64748b;
+	margin-bottom: 4px;
+}
+
+.tool-call-collapsible__code {
+	margin: 0;
+	padding: 8px;
+	background: #0f172a;
+	border-radius: 4px;
+	font-size: 11px;
+	line-height: 1.5;
+	color: #cbd5e1;
+	overflow-x: auto;
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+
+/* ── Markdown content ────────────────────────────────────────────────── */
+
+.chat-message__content :global(.prose) {
+	font-size: 14px;
+	line-height: 1.6;
+	color: #e2e8f0;
+}
+
+.chat-message__content :global(ul),
+.chat-message__content :global(ol) {
+	padding-left: 1.5em;
+	margin: 0.5em 0;
+}
+
+.chat-message__content :global(li) {
+	margin: 0.25em 0;
+}
+
+.chat-message__content :global(p) {
+	margin: 0.5em 0;
+}
+
+.chat-message__content :global(code) {
+	padding: 2px 5px;
+	background: rgba(100, 116, 139, 0.2);
+	border-radius: 3px;
+	font-size: 13px;
+	font-family: "SF Mono", "Fira Code", monospace;
+	color: #e2e8f0;
+}
+
+.chat-message__content :global(pre) {
+	margin: 0.75em 0;
+	padding: 12px;
+	background: #0f172a;
+	border-radius: 6px;
+	overflow-x: auto;
+}
+
+.chat-message__content :global(pre code) {
+	padding: 0;
+	background: none;
+	font-size: 12px;
+	color: #e2e8f0;
+}
+
+.chat-message__content :global(table) {
+	border-collapse: collapse;
+	width: 100%;
+	margin: 0.75em 0;
+	font-size: 13px;
+}
+
+.chat-message__content :global(th),
+.chat-message__content :global(td) {
+	border: 1px solid #334155;
+	padding: 6px 10px;
+	text-align: left;
+}
+
+.chat-message__content :global(th) {
+	background: #1e293b;
+	font-weight: 600;
+}
+
+.chat-message__content :global(a) {
+	color: #60a5fa;
+	text-decoration: none;
+}
+
+.chat-message__content :global(a:hover) {
+	text-decoration: underline;
+}
+
+.chat-message__content :global(blockquote) {
+	border-left: 3px solid #3b82f6;
+	padding-left: 12px;
+	color: #94a3b8;
+	margin: 0.5em 0;
+}
+
+.chat-message__content :global(strong) {
+	color: #f1f5f9;
+	font-weight: 600;
+}
+
+.chat-message__content :global(ul) {
+	list-style-type: disc;
+}
+
+.chat-message__content :global(ol) {
+	list-style-type: decimal;
+}

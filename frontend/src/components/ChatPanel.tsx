@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { useApp } from "../store/AppContext";
 import { useModels } from "../hooks/useModels";
 import { useWebSocket } from "../hooks/useWebSocket";
@@ -14,10 +16,17 @@ import "./components.css";
 // Types
 // ---------------------------------------------------------------------------
 
+interface ToolCallEntry {
+	name: string;
+	args?: string;
+	result?: string;
+}
+
 interface DisplayMessage {
 	id: string;
 	role: "user" | "assistant";
 	content: string;
+	toolCalls: ToolCallEntry[];
 	timestamp: number;
 }
 
@@ -66,29 +75,63 @@ function extractText(event: Record<string, unknown>): string {
 	return "";
 }
 
-function extractToolName(event: Record<string, unknown>): string | null {
+function extractToolCall(event: Record<string, unknown>): ToolCallEntry | null {
 	// Direct fields (fallback)
-	if (typeof event.tool_name === "string") return event.tool_name;
-	if (typeof event.command === "string") return event.command;
-	if (typeof event.function === "string") return event.function;
+	if (typeof event.tool_name === "string") {
+		return { name: event.tool_name, args: undefined, result: undefined };
+	}
+	if (typeof event.command === "string") {
+		return { name: event.command, args: undefined, result: undefined };
+	}
+	if (typeof event.function === "string") {
+		return { name: event.function, args: undefined, result: undefined };
+	}
 
-	// assistantMessageEvent for toolcall events (per RPC protocol docs)
 	const ami = event.assistantMessageEvent as
 		| {
 				type?: string;
-				toolCall?: { name?: unknown };
+				toolCall?: { name?: unknown; arguments?: unknown };
+				result?: { output?: unknown };
 		  }
 		| undefined;
 	if (ami) {
 		const deltaType = ami.type;
 
-		// toolcall_delta / toolcall_end: toolCall.name has the function name
-		if (
-			(deltaType === "toolcall_delta" || deltaType === "toolcall_end") &&
-			ami.toolCall
-		) {
-			const name = ami.toolCall.name;
-			if (typeof name === "string" && name) return name;
+		// toolcall_delta: toolCall.name + toolCall.arguments
+		if (deltaType === "toolcall_delta" || deltaType === "toolcall_end") {
+			if (ami.toolCall) {
+				const entry: ToolCallEntry = {
+					name: "",
+					args: undefined,
+					result: undefined,
+				};
+				if (typeof ami.toolCall.name === "string" && ami.toolCall.name) {
+					entry.name = ami.toolCall.name;
+				}
+				if (ami.toolCall.arguments) {
+					try {
+						entry.args =
+							typeof ami.toolCall.arguments === "string"
+								? ami.toolCall.arguments
+								: JSON.stringify(ami.toolCall.arguments);
+					} catch {
+						entry.args = String(ami.toolCall.arguments);
+					}
+				}
+				return entry;
+			}
+		}
+
+		// toolcall_result: capture result output
+		if (deltaType === "toolcall_result" && ami.result?.output !== undefined) {
+			return {
+				name: (event._toolName as string) || "unknown",
+				args: undefined,
+				result:
+					typeof ami.result.output === "string"
+						? ami.result.output
+						: JSON.stringify(ami.result.output),
+			};
 		}
 	}
 
@@ -101,6 +144,99 @@ function isStreamFinalizer(event: Record<string, unknown>): boolean {
 	if (event.status === "done" || event.status === "finished") return true;
 	if (event.type === "response" && event.id) return true;
 	return false;
+}
+
+// ---------------------------------------------------------------------------
+// Sub-components
+// ---------------------------------------------------------------------------
+
+/** Collapsible tool call with args/result display */
+function ToolCallCollapsible({ call }: { call: ToolCallEntry }) {
+	const [expanded, setExpanded] = useState(false);
+
+	return (
+		<details
+			className="tool-call-collapsible"
+			open={false}
+			onToggle={(e) => setExpanded((e.target as HTMLDetailsElement).open)}
+		>
+			<summary className="tool-call-collapsible__summary">
+				<span className="tool-call-collapsible__icon">
+					{expanded ? "▾" : "▸"}
+				</span>
+				<span className="tool-call-collapsible__name">🔧 {call.name}</span>
+				{call.args && (
+					<span className="tool-call-collapsible__tag">with args</span>
+				)}
+				{call.result && (
+					<span className="tool-call-collapsible__tag tool-call-collapsible__tag--result">
+						with result
+					</span>
+				)}
+			</summary>
+			<div className="tool-call-collapsible__body">
+				{call.args && (
+					<div className="tool-call-collapsible__section">
+						<div className="tool-call-collapsible__label">Input</div>
+						<pre className="tool-call-collapsible__code">{call.args}</pre>
+					</div>
+				)}
+				{call.result && (
+					<div className="tool-call-collapsible__section">
+						<div className="tool-call-collapsible__label">Output</div>
+						<pre className="tool-call-collapsible__code">{call.result}</pre>
+					</div>
+				)}
+			</div>
+		</details>
+	);
+}
+
+/** Renders an assistant message with markdown and collapsible tool calls */
+function AssistantMessage({ msg }: { msg: DisplayMessage }) {
+	const [expandedAll, setExpandedAll] = useState(false);
+
+	return (
+		<div className="chat-message chat-message--assistant">
+			<div className="chat-message__avatar">π</div>
+			<div className="chat-message__body">
+				<div className="chat-message__role">
+					Pi
+					<span className="chat-message__time">
+						{new Date(msg.timestamp).toLocaleTimeString([], {
+							hour: "2-digit",
+							minute: "2-digit",
+						})}
+					</span>
+				</div>
+
+				{/* Tool calls (collapsible, default collapsed) */}
+				{msg.toolCalls.length > 0 && (
+					<div className="assistant-tool-calls">
+						<div
+							className="assistant-tool-calls__toggle"
+							onClick={() => setExpandedAll(!expandedAll)}
+						>
+							<span>
+								{expandedAll ? "▾" : "▸"} Tool calls ({msg.toolCalls.length})
+							</span>
+						</div>
+						{expandedAll &&
+							msg.toolCalls.map((call, i) => (
+								<ToolCallCollapsible key={i} call={call} />
+							))}
+					</div>
+				)}
+
+				{/* Markdown content */}
+				<div className="chat-message__content">
+					<ReactMarkdown remarkPlugins={[remarkGfm]}>
+						{msg.content}
+					</ReactMarkdown>
+				</div>
+			</div>
+		</div>
+	);
 }
 
 // ---------------------------------------------------------------------------
@@ -133,9 +269,9 @@ export default function ChatPanel() {
 
 	// ── Streaming state ─────────────────────────────────────────────────────
 	const [streamingContent, setStreamingContent] = useState("");
-	const [toolCallNames, setToolCallNames] = useState<string[]>([]);
+	const [toolCalls, setToolCalls] = useState<ToolCallEntry[]>([]);
 	const isStreaming =
-		streamingContent.trim().length > 0 || toolCallNames.length > 0;
+		streamingContent.trim().length > 0 || toolCalls.length > 0;
 
 	// ── Input state ──────────────────────────────────────────────────────────
 	const [input, setInput] = useState("");
@@ -155,7 +291,7 @@ export default function ChatPanel() {
 		if (ws.connectionSequence !== prevConnectionSeqRef.current) {
 			setDisplayMessages([]);
 			setStreamingContent("");
-			setToolCallNames([]);
+			setToolCalls([]);
 			prevConnectionSeqRef.current = ws.connectionSequence;
 		}
 	}, [ws.connectionSequence]);
@@ -163,7 +299,7 @@ export default function ChatPanel() {
 	// Scroll to bottom whenever messages or streaming content changes
 	useEffect(() => {
 		messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-	}, [displayMessages, streamingContent, toolCallNames]);
+	}, [displayMessages, streamingContent, toolCalls]);
 
 	// ── Process new RPC events from the hook ─────────────────────────────────
 	useEffect(() => {
@@ -184,11 +320,15 @@ export default function ChatPanel() {
 
 			// ── End-of-stream marker → finalize current turn ───────────────
 			if (isStreamFinalizer(event)) {
-				if (streamingContent.trim() || toolCallNames.length > 0) {
-					const lines = [
-						...toolCallNames.map((tc) => `> ${tc}`),
-						streamingContent.trim(),
-					].filter(Boolean);
+				if (streamingContent.trim() || toolCalls.length > 0) {
+					const toolLines = toolCalls
+						.map((tc) => {
+							const argsLine = tc.args ? `\n  args: ${tc.args}` : "";
+							const resultLine = tc.result ? `\n  result: ${tc.result}` : "";
+							return `> ${tc.name}${argsLine}${resultLine}`;
+						})
+						.filter(Boolean);
+					const lines = [...toolLines, streamingContent.trim()].filter(Boolean);
 
 					if (lines.length) {
 						// eslint-disable-next-line react-hooks/set-state-in-effect
@@ -198,13 +338,14 @@ export default function ChatPanel() {
 								id: `assistant-${Date.now()}`,
 								role: "assistant",
 								content: lines.join("\n\n"),
+								toolCalls: [...toolCalls],
 								timestamp: Date.now(),
 							},
 						]);
 					}
 				}
 				setStreamingContent("");
-				setToolCallNames([]);
+				setToolCalls([]);
 				continue;
 			}
 
@@ -215,9 +356,21 @@ export default function ChatPanel() {
 			}
 
 			// ── Tool call → track ──────────────────────────────────────────
-			const toolName = extractToolName(event);
-			if (toolName) {
-				setToolCallNames((prev) => [...prev, toolName]);
+			const toolCall = extractToolCall(event);
+			if (toolCall) {
+				setToolCalls((prev) => {
+					const idx = prev.findIndex((tc) => tc.name === toolCall!.name);
+					if (idx >= 0) {
+						// Update existing call (args then result arrive as events)
+						const updated = [...prev];
+						if (toolCall.args)
+							updated[idx] = { ...updated[idx], args: toolCall.args };
+						if (toolCall.result)
+							updated[idx] = { ...updated[idx], result: toolCall.result };
+						return updated;
+					}
+					return [...prev, toolCall];
+				});
 			}
 		}
 
@@ -230,11 +383,15 @@ export default function ChatPanel() {
 		if (!trimmed) return;
 
 		// Finalize any current streaming content before the new user message
-		if (streamingContent.trim() || toolCallNames.length > 0) {
-			const lines = [
-				...toolCallNames.map((tc) => `> ${tc}`),
-				streamingContent.trim(),
-			].filter(Boolean);
+		if (streamingContent.trim() || toolCalls.length > 0) {
+			const toolLines = toolCalls
+				.map((tc) => {
+					const argsLine = tc.args ? `\n  args: ${tc.args}` : "";
+					const resultLine = tc.result ? `\n  result: ${tc.result}` : "";
+					return `> ${tc.name}${argsLine}${resultLine}`;
+				})
+				.filter(Boolean);
+			const lines = [...toolLines, streamingContent.trim()].filter(Boolean);
 
 			if (lines.length) {
 				setDisplayMessages((prev) => [
@@ -243,19 +400,21 @@ export default function ChatPanel() {
 						id: `assistant-${Date.now()}`,
 						role: "assistant",
 						content: lines.join("\n\n"),
+						toolCalls: [...toolCalls],
 						timestamp: Date.now(),
 					},
 				]);
 			}
 		}
 		setStreamingContent("");
-		setToolCallNames([]);
+		setToolCalls([]);
 
 		// Add user message to display
 		const userMsg: DisplayMessage = {
 			id: `user-${Date.now()}`,
 			role: "user",
 			content: trimmed,
+			toolCalls: [],
 			timestamp: Date.now(),
 		};
 		setDisplayMessages((prev) => [...prev, userMsg]);
@@ -264,7 +423,7 @@ export default function ChatPanel() {
 
 		// Forward to Pi via WebSocket
 		ws.send(trimmed);
-	}, [input, streamingContent, toolCallNames, ws]);
+	}, [input, streamingContent, toolCalls, ws]);
 
 	// ── Model switcher ───────────────────────────────────────────────────────
 	const handleSwitchModel = useCallback(
@@ -398,9 +557,7 @@ export default function ChatPanel() {
 
 	// ── Empty state ──────────────────────────────────────────────────────────
 	const isEmpty =
-		displayMessages.length === 0 &&
-		!streamingContent &&
-		toolCallNames.length === 0;
+		displayMessages.length === 0 && !streamingContent && toolCalls.length === 0;
 
 	// ── Render ───────────────────────────────────────────────────────────────
 	return (
@@ -534,6 +691,32 @@ export default function ChatPanel() {
 					)}
 				</div>
 
+				{/* Clear chat */}
+				{displayMessages.length > 0 && (
+					<button
+						className="btn btn--sm btn--clear"
+						onClick={() => {
+							setDisplayMessages([]);
+							setStreamingContent("");
+							setToolCalls([]);
+						}}
+						title="Clear chat"
+					>
+						<svg
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							strokeWidth="2"
+							width="14"
+							height="14"
+						>
+							<line x1="18" y1="6" x2="6" y2="18" />
+							<line x1="6" y1="6" x2="18" y2="18" />
+						</svg>
+						Clear
+					</button>
+				)}
+
 				{/* Session controls */}
 				<div style={{ display: "flex", gap: 4 }}>
 					{closingState === "none" ? (
@@ -647,25 +830,11 @@ export default function ChatPanel() {
 				{displayMessages
 					.filter((m) => m.role === "assistant")
 					.map((msg) => (
-						<div key={msg.id} className="chat-message chat-message--assistant">
-							<div className="chat-message__avatar">π</div>
-							<div className="chat-message__body">
-								<div className="chat-message__role">
-									Pi
-									<span className="chat-message__time">
-										{new Date(msg.timestamp).toLocaleTimeString([], {
-											hour: "2-digit",
-											minute: "2-digit",
-										})}
-									</span>
-								</div>
-								<div className="chat-message__content">{msg.content}</div>
-							</div>
-						</div>
+						<AssistantMessage key={msg.id} msg={msg} />
 					))}
 
 				{/* Streaming assistant message (content arriving in real-time) */}
-				{streamingContent || toolCallNames.length > 0 ? (
+				{streamingContent || toolCalls.length > 0 ? (
 					<div
 						className="chat-message chat-message--assistant"
 						style={{ opacity: 0.9 }}
@@ -678,11 +847,11 @@ export default function ChatPanel() {
 							</div>
 
 							{/* Tool call badges */}
-							{toolCallNames.length > 0 && (
+							{toolCalls.length > 0 && (
 								<div className="tool-call-badges">
-									{toolCallNames.map((name, i) => (
+									{toolCalls.map((tc, i) => (
 										<span key={i} className="tool-call-badge">
-											🔧 {name}
+											🔧 {tc.name}
 										</span>
 									))}
 								</div>
