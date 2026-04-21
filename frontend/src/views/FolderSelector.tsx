@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useApp } from "../store/AppContext";
 import { listDirectories, listSessions } from "../services/api";
 import "./views.css";
@@ -258,18 +258,18 @@ export default function FolderSelector() {
 			created_at: string;
 		}>
 	>([]);
-	const [sessionsLoaded, setSessionsLoaded] = useState(false);
+	const sessionsFetched = useRef(false);
 
 	// Fetch active sessions on mount (always, so the Sessions tab can appear)
 	useEffect(() => {
-		if (sessionsLoaded) return;
+		if (sessionsFetched.current) return;
+		sessionsFetched.current = true;
 		listSessions()
 			.then((s) => {
 				const running = s.filter((item) => item.status === "running");
 				setSessions(running);
-				setSessionsLoaded(true);
 			})
-			.catch(() => setSessionsLoaded(true));
+			.catch(() => {});
 	}, []);
 
 	const handleOpen = (path: string) => {
