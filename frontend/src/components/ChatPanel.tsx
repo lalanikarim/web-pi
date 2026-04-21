@@ -264,7 +264,7 @@ export default function ChatPanel() {
 	// WebSocket connection (one per project — uses sessionId for WS URL)
 	const ws = useWebSocket(selectedFolder, modelRef, selectedSessionId);
 
-	// ── Display state: finalized messages ────────────────────────────────────
+	// ── Display state: finalized messages (sorted by timestamp) ──────────────
 	const [displayMessages, setDisplayMessages] = useState<DisplayMessage[]>([]);
 
 	// ── Streaming state ─────────────────────────────────────────────────────
@@ -272,6 +272,12 @@ export default function ChatPanel() {
 	const [toolCalls, setToolCalls] = useState<ToolCallEntry[]>([]);
 	const isStreaming =
 		streamingContent.trim().length > 0 || toolCalls.length > 0;
+
+	// ── Chat panel expand state ────────────────────────────────────────────
+	const [isExpanded, setIsExpanded] = useState(false);
+
+	// Track if history load has been requested (ref to avoid effect cycles)
+	const historyRequestedRef = useRef(false);
 
 	// ── Input state ──────────────────────────────────────────────────────────
 	const [input, setInput] = useState("");
@@ -293,8 +299,25 @@ export default function ChatPanel() {
 			setStreamingContent("");
 			setToolCalls([]);
 			prevConnectionSeqRef.current = ws.connectionSequence;
+			historyRequestedRef.current = false;
+			processedCountRef.current = 0;
 		}
 	}, [ws.connectionSequence]);
+
+	// Load chat history when WS connects
+	useEffect(() => {
+		if (
+			ws.state !== "connected" ||
+			historyRequestedRef.current ||
+			!selectedSessionId
+		) {
+			return;
+		}
+
+		// Send get_messages RPC to fetch historical messages
+		ws.send({ type: "get_messages" });
+		historyRequestedRef.current = true;
+	}, [ws.state, ws.send, selectedSessionId]);
 
 	// Scroll to bottom whenever messages or streaming content changes
 	useEffect(() => {
@@ -717,6 +740,39 @@ export default function ChatPanel() {
 					</button>
 				)}
 
+				{/* Expand/collapse chat */}
+				<button
+					className="btn btn--sm btn--expand"
+					onClick={() => setIsExpanded(!isExpanded)}
+					title={isExpanded ? "Collapse chat" : "Expand chat"}
+				>
+					{isExpanded ? (
+						<svg
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							strokeWidth="2"
+							width="14"
+							height="14"
+						>
+							<path d="M18 6L6 18M6 6l12 12" />
+						</svg>
+					) : (
+						<svg
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							strokeWidth="2"
+							width="14"
+							height="14"
+						>
+							<rect x="3" y="3" width="18" height="18" rx="2" />
+							<path d="M9 3v18" />
+						</svg>
+					)}
+					{isExpanded ? "Collapse" : "Expand"}
+				</button>
+
 				{/* Session controls */}
 				<div style={{ display: "flex", gap: 4 }}>
 					{closingState === "none" ? (
@@ -805,33 +861,31 @@ export default function ChatPanel() {
 					</div>
 				)}
 
-				{/* User messages */}
+				{/* Messages interleaved by timestamp (oldest first) */}
 				{displayMessages
-					.filter((m) => m.role === "user")
-					.map((msg) => (
-						<div key={msg.id} className="chat-message chat-message--user">
-							<div className="chat-message__avatar">You</div>
-							<div className="chat-message__body">
-								<div className="chat-message__role">
-									You
-									<span className="chat-message__time">
-										{new Date(msg.timestamp).toLocaleTimeString([], {
-											hour: "2-digit",
-											minute: "2-digit",
-										})}
-									</span>
+					.slice()
+					.sort((a, b) => a.timestamp - b.timestamp)
+					.map((msg) =>
+						msg.role === "user" ? (
+							<div key={msg.id} className="chat-message chat-message--user">
+								<div className="chat-message__avatar">You</div>
+								<div className="chat-message__body">
+									<div className="chat-message__role">
+										You
+										<span className="chat-message__time">
+											{new Date(msg.timestamp).toLocaleTimeString([], {
+												hour: "2-digit",
+												minute: "2-digit",
+											})}
+										</span>
+									</div>
+									<div className="chat-message__content">{msg.content}</div>
 								</div>
-								<div className="chat-message__content">{msg.content}</div>
 							</div>
-						</div>
-					))}
-
-				{/* Assistant messages (finalized) */}
-				{displayMessages
-					.filter((m) => m.role === "assistant")
-					.map((msg) => (
-						<AssistantMessage key={msg.id} msg={msg} />
-					))}
+						) : (
+							<AssistantMessage key={msg.id} msg={msg} />
+						),
+					)}
 
 				{/* Streaming assistant message (content arriving in real-time) */}
 				{streamingContent || toolCalls.length > 0 ? (

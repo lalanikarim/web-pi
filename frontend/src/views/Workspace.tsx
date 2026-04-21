@@ -8,7 +8,7 @@ import ChatPanel from "../components/ChatPanel";
 export default function Workspace() {
 	const { currentModel, selectedFolder } = useApp();
 	const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-	const [chatCollapsed, setChatCollapsed] = useState(false);
+	const [chatExpanded, setChatExpanded] = useState(false);
 	const [runningCount, setRunningCount] = useState<number | null>(null);
 
 	// Fetch project info to show running session count
@@ -56,9 +56,9 @@ export default function Workspace() {
 				</div>
 				<div className="view-workspace__header-right">
 					<button
-						className="icon-btn"
-						onClick={() => setChatCollapsed(!chatCollapsed)}
-						title="Toggle chat"
+						className={`icon-btn ${chatExpanded ? "icon-btn--active" : ""}`}
+						onClick={() => setChatExpanded(!chatExpanded)}
+						title={chatExpanded ? "Collapse chat to full width" : "Expand chat"}
 					>
 						<svg
 							viewBox="0 0 24 24"
@@ -68,25 +68,36 @@ export default function Workspace() {
 							width="18"
 							height="18"
 						>
-							<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+							{chatExpanded ? (
+								<path d="M18 6L6 18M6 6l12 12" />
+							) : (
+								<>
+									<rect x="3" y="3" width="18" height="18" rx="2" />
+									<path d="M9 3v18" />
+								</>
+							)}
 						</svg>
 					</button>
 				</div>
 			</header>
 
-			<div className="view-workspace__body">
+			<div
+				className={`view-workspace__body ${chatExpanded ? "view-workspace__body--chat-expanded" : ""}`}
+			>
 				<div
-					className={`view-workspace__sidebar ${sidebarCollapsed ? "view-workspace__sidebar--collapsed" : ""}`}
+					className={`view-workspace__sidebar ${sidebarCollapsed ? "view-workspace__sidebar--collapsed" : ""} ${chatExpanded ? "view-workspace__sidebar--hidden" : ""}`}
 				>
 					<ProjectTree />
 				</div>
 
-				<div className="view-workspace__preview">
+				<div
+					className={`view-workspace__preview ${chatExpanded ? "view-workspace__preview--hidden" : ""}`}
+				>
 					<FilePreview />
 				</div>
 
 				<div
-					className={`view-workspace__chat ${chatCollapsed ? "view-workspace__chat--collapsed" : ""}`}
+					className={`view-workspace__chat ${chatExpanded ? "view-workspace__chat--expanded" : ""}`}
 				>
 					<ChatPanel />
 				</div>

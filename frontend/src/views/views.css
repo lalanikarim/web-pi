@@ -471,6 +471,22 @@
 	width: 0;
 }
 
+/* ── Chat expanded state ─────────────────────────────────────────────── */
+
+.view-workspace__body--chat-expanded .view-workspace__sidebar,
+.view-workspace__body--chat-expanded .view-workspace__preview {
+	display: none;
+}
+
+.view-workspace__body--chat-expanded .view-workspace__chat {
+	flex: 1;
+	width: 100%;
+}
+
+.icon-btn--active {
+	color: #60a5fa;
+}
+
 /* ── Model selector search ────────────────────────────────────────── */
 
 .view-models__search {
