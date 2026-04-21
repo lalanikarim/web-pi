@@ -50,6 +50,7 @@ interface UseModelsResult {
 	loading: boolean;
 	error: string | null;
 	sessionId: string | null;
+	runningCount: number | null;
 }
 
 /**
@@ -68,6 +69,7 @@ export function useModels(projectPath?: string | null): UseModelsResult {
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 	const [sessionId, setSessionId] = useState<string | null>(null);
+	const [runningCount, setRunningCount] = useState<number | null>(null);
 	const launchedRef = useRef(false);
 	const prevProjectRef = useRef<string | null>(null);
 	const abortControllerRef = useRef<AbortController | null>(null);
@@ -83,6 +85,7 @@ export function useModels(projectPath?: string | null): UseModelsResult {
 			launchedRef.current = false;
 			prevProjectRef.current = projectPath ?? null;
 			setSessionId(null);
+			setRunningCount(null);
 			setModels([]);
 			setLoading(true);
 			setError(null);
@@ -113,6 +116,9 @@ export function useModels(projectPath?: string | null): UseModelsResult {
 					const session = await createSession(projectPath);
 					activeSessionId = session.session_id;
 					setSessionId(session.session_id);
+					if (session.running_count !== undefined) {
+						setRunningCount(session.running_count);
+					}
 				} catch {
 					if (!abortControllerRef.current?.signal.aborted) {
 						setError("Failed to connect to Pi. Could not fetch models.");
@@ -187,5 +193,5 @@ export function useModels(projectPath?: string | null): UseModelsResult {
 		};
 	}, [projectPath]);
 
-	return { models, loading, error, sessionId };
+	return { models, loading, error, sessionId, runningCount };
 }

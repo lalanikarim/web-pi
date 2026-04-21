@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useApp } from "../store/AppContext";
 import { useModels } from "../hooks/useModels";
-import { getProjectInfo } from "../services/api";
 import "./views.css";
 import "./common.css";
 
@@ -15,9 +14,9 @@ export default function ModelSelector() {
 		setView,
 		setSessionId,
 	} = useApp();
-	const { models, loading, error, sessionId } = useModels(selectedFolder);
+	const { models, loading, error, sessionId, runningCount } =
+		useModels(selectedFolder);
 	const [switching, setSwitching] = useState(false);
-	const [runningCount, setRunningCount] = useState<number | null>(null);
 	const [search, setSearch] = useState("");
 	const [selectedProviders, setSelectedProviders] = useState<string[]>([]);
 
@@ -85,14 +84,6 @@ export default function ModelSelector() {
 			</>
 		);
 	}
-
-	// Fetch project info to show running sessions
-	useEffect(() => {
-		if (!selectedFolder) return;
-		getProjectInfo(selectedFolder)
-			.then((info) => setRunningCount(info.running_count ?? 0))
-			.catch(() => {});
-	}, [selectedFolder]);
 
 	// Persist sessionId so ChatPanel can use it for WebSocket URL
 	useEffect(() => {

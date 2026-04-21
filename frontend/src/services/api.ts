@@ -103,6 +103,7 @@ export interface SessionRecord {
 	created_at: string;
 	ws_session_id?: string;
 	ws_connected: boolean;
+	running_count?: number;
 }
 
 /**

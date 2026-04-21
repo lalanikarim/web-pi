@@ -103,8 +103,8 @@ async def get_project_info(
 # ---------------------------------------------------------------------------
 
 
-@router.post("", response_model=SessionRecord)
-@router.post("/", response_model=SessionRecord, include_in_schema=False)
+@router.post("", response_model=dict)
+@router.post("/", response_model=dict, include_in_schema=False)
 async def create_session(
     req: SessionCreateRequest,
     project_path: str = Query(..., description="Absolute path to the project directory"),
@@ -129,6 +129,8 @@ async def create_session(
             project_path=str(resolved),
             name=name,
         )
-        return record
+        existing = session_manager.get_sessions(str(resolved))
+        running_count = len([s for s in existing if s.status == "running"])
+        return {**record.model_dump(), "running_count": running_count}
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Failed to create session: {exc}") from exc
