@@ -40,17 +40,15 @@
 ## Pending
 
 ### Near-term
-- [ ] **Display tool call args/results** — currently only shows tool names; enhance `extractToolName` to also pull `args`/`result` from rpc_events
-- [ ] **Markdown rendering** — Pi responses are plain text; add a markdown-to-HTML transformer for richer display
-- [ ] **Multi-turn message history** — the `clearMessages` hook function exists but isn't called; wire "clear chat" button or auto-purge on model switch
-- [ ] **WS URL uses `projectFolder` but backend expects `session_id`** — the hook constructs `/api/projects/${projectFolder}/ws` but the backend chat.py expects `?session_id=...`. This needs a fix in the WS URL construction or backend endpoint.
-- [ ] **Skip model fetch from server if already cached** — `useModels` currently always creates a session and polls for models; add a client-side cache check (localStorage) to skip the network round-trip entirely when a fresh cache exists
+- [x] **Display tool call args/results + collapsible** — enhanced `extractToolCall` to pull args/result from rpc_events; AssistantMessage renders collapsible tool call sections (default collapsed) with expand-all toggle
+- [x] **Markdown rendering in chat responses** — added react-markdown + remark-gfm; assistant messages rendered as rich markdown (code blocks, tables, lists, blockquotes)
+- [x] **Multi-turn message history / clear chat** — added clear chat button in ChatPanel header that resets all message/tool-call state
+- [x] **WS URL uses `projectFolder` but backend expects `session_id`** — already correct: useWebSocket constructs `/api/projects/ws?session_id=...`
+- [ ] **Skip model fetch from server if already cached** — `useModels` already has localStorage cache (30min TTL) but still creates a session and polls in background; could optimize to skip session creation when cache is fresh
 - [ ] **Model refresh button in ModelSelector** — add a refresh/reload button that forces a new session and re-polls models from Pi, bypassing the cache
-- [ ] **Provider filter default logic: inverted** — currently providers default to "selected" on load; invert so that when no filters are selected, all models are visible; when one or more providers are selected, only those providers' models are shown
-- [ ] **Chat input stays disabled after agent end event** — the chat input button is disabled while `isStreaming` is true, but `isStreamFinalizer` only checks for `end_turn`/`end`/`status: done` events; ensure the agent end event clears streaming state properly so the send button re-enables
-- [ ] **Markdown rendering in chat responses** — render assistant text responses as markdown using a library (e.g. `react-markdown`) instead of plain text
-- [ ] **Model selection doesn't work from chat view** — the model switcher dropdown in ChatPanel header doesn't correctly switch the active model; wire `handleSwitchModel` to both `ws.send({ type: "set_model", ... })` and the AppContext so the WS session uses the new model
-- [ ] **Tool call rendering: collapsible with default collapsed** — tool call pills should expand to show a collapsible section with the tool's input/output; section defaults to collapsed state with expand/collapse toggle
+- [x] **Provider filter default logic: inverted** — removed auto-select-all effect; filter now applies whenever selectedProviders > 0 (empty = all shown)
+- [x] **Chat input stays disabled after agent end event** — added `agent_end` to isStreamFinalizer check so streaming state clears properly
+- [x] **Model selection doesn't work from chat view** — wired handleSwitchModel to call REST switchModel (persist) + WS set_model (immediate effect)
 
 ### Medium-term
 - [ ] **Typing indicator for streaming** — show "Pi is thinking" during the initial delay before first event arrives
