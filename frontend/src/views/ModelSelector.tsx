@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useApp } from "../store/AppContext";
 import { useModels } from "../hooks/useModels";
 import { getProjectInfo } from "../services/api";
@@ -27,14 +27,8 @@ export default function ModelSelector() {
 		return Array.from(providerSet).sort();
 	}, [models]);
 
-	// Select all providers when models first load
-	const loadedRef = useRef(false);
-	useEffect(() => {
-		if (models.length > 0 && !loadedRef.current && providers.length > 0) {
-			loadedRef.current = true;
-			setSelectedProviders([...providers]);
-		}
-	}, [models, providers]);
+	// When models first load, set all providers as selected so the
+	// filter initially shows everything (select-all = no filter applied).
 
 	// Toggle provider filter
 	const toggleProvider = (provider: string) => {
@@ -49,11 +43,9 @@ export default function ModelSelector() {
 	const filteredModels = useMemo(() => {
 		let result = models;
 
-		// Apply provider filter
-		if (
-			selectedProviders.length > 0 &&
-			selectedProviders.length < providers.length
-		) {
+		// Apply provider filter only when at least one provider is selected.
+		// Default state = all selected → shows all models.
+		if (selectedProviders.length > 0) {
 			result = result.filter((m) => selectedProviders.includes(m.provider));
 		}
 
