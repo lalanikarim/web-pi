@@ -71,6 +71,11 @@ export async function listProjects(): Promise<string[]> {
 	return request<string[]>("/api");
 }
 
+/** List all active sessions across all projects */
+export async function listSessions(): Promise<SessionListItem[]> {
+	return request<SessionListItem[]>("/api/sessions");
+}
+
 /** Get project details including all active sessions */
 export async function getProjectInfo(
 	projectPath: string,
@@ -155,7 +160,7 @@ export async function switchModel(
 }
 
 // ---------------------------------------------------------------------------
-// Sessions
+// Sessions (close/delete)
 // ---------------------------------------------------------------------------
 
 export interface SessionCloseResponse {

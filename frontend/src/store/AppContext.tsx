@@ -8,6 +8,18 @@ import {
 } from "react";
 import type { AppState, AppView, Model } from "../types";
 
+export interface SessionRecord {
+	session_id: string;
+	name: string;
+	project_path: string;
+	model_id: string;
+	status: string;
+	pid?: number;
+	created_at: string;
+	ws_session_id?: string;
+	ws_connected: boolean;
+}
+
 const initialAppState: AppState = {
 	view: "folders",
 	selectedFolder: null,
@@ -15,6 +27,7 @@ const initialAppState: AppState = {
 	currentModel: null,
 	selectedFile: null,
 	sessionId: null,
+	selectedSession: null,
 };
 
 interface AppContextType extends AppState {
@@ -25,6 +38,7 @@ interface AppContextType extends AppState {
 	switchModel: (model: Model) => void;
 	setSelectedFile: (path: string | null) => void;
 	setSessionId: (id: string | null) => void;
+	setSelectedSession: (session: SessionRecord | null) => void;
 }
 
 const AppContext = createContext<AppContextType>(
@@ -66,6 +80,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
 		setState((prev) => ({ ...prev, sessionId: id }));
 	}, []);
 
+	const setSelectedSession = useCallback((session: SessionRecord | null) => {
+		setState((prev) => ({
+			...prev,
+			sessionId: session ? session.session_id : prev.sessionId,
+			selectedSession: session,
+			selectedFolder: session ? session.project_path : prev.selectedFolder,
+		}));
+	}, []);
+
 	return (
 		<AppContext.Provider
 			value={{
@@ -77,6 +100,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 				switchModel,
 				setSelectedFile,
 				setSessionId,
+				setSelectedSession,
 			}}
 		>
 			{children}

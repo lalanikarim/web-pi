@@ -63,6 +63,17 @@ async def list_projects() -> List[str]:
 
 
 # ---------------------------------------------------------------------------
+# GET /sessions — all active sessions across all projects
+# ---------------------------------------------------------------------------
+
+
+@router.get("/sessions", response_model=List[SessionRecord])
+async def list_sessions():
+    """List all active sessions across all projects."""
+    return session_manager.get_all_sessions()
+
+
+# ---------------------------------------------------------------------------
 # GET /info — project info + sessions
 # ---------------------------------------------------------------------------
 

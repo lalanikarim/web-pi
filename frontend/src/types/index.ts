@@ -30,4 +30,5 @@ export interface AppState {
 	currentModel: Model | null;
 	selectedFile: string | null;
 	sessionId: string | null;
+	selectedSession: { session_id: string; project_path: string } | null;
 }
