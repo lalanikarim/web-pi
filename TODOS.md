@@ -49,6 +49,9 @@
 - [x] **Provider filter default logic: inverted** — removed auto-select-all effect; filter now applies whenever selectedProviders > 0 (empty = all shown)
 - [x] **Chat input stays disabled after agent end event** — added `agent_end` to isStreamFinalizer check so streaming state clears properly
 - [x] **Model selection doesn't work from chat view** — wired handleSwitchModel to call REST switchModel (persist) + WS set_model (immediate effect)
+- [ ] **Chat message ordering** — user prompts and assistant responses are not interleaved correctly; all prompts cluster at the top while responses appear at the bottom. Messages should be sorted by creation timestamp (oldest first) so prompts and responses alternate in conversation order, and the view should auto-scroll to reveal the latest message at the bottom
+- [ ] **Expandable chat panel** — allow the ChatPanel to expand to fill the entire workspace view (toggle between compact and full-width mode), useful for reading long assistant responses and managing conversations on smaller screens
+- [ ] **Populate chat history on workspace load** — use `get_state` RPC call when workspace loads to determine the current model and fetch prior chat history; read session file to repopulate previous conversation messages in the chat window so resuming a session continues from where it left off
 
 ### Medium-term
 - [ ] **Typing indicator for streaming** — show "Pi is thinking" during the initial delay before first event arrives
