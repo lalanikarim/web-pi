@@ -44,6 +44,13 @@
 - [ ] **Markdown rendering** — Pi responses are plain text; add a markdown-to-HTML transformer for richer display
 - [ ] **Multi-turn message history** — the `clearMessages` hook function exists but isn't called; wire "clear chat" button or auto-purge on model switch
 - [ ] **WS URL uses `projectFolder` but backend expects `session_id`** — the hook constructs `/api/projects/${projectFolder}/ws` but the backend chat.py expects `?session_id=...`. This needs a fix in the WS URL construction or backend endpoint.
+- [ ] **Skip model fetch from server if already cached** — `useModels` currently always creates a session and polls for models; add a client-side cache check (localStorage) to skip the network round-trip entirely when a fresh cache exists
+- [ ] **Model refresh button in ModelSelector** — add a refresh/reload button that forces a new session and re-polls models from Pi, bypassing the cache
+- [ ] **Provider filter default logic: inverted** — currently providers default to "selected" on load; invert so that when no filters are selected, all models are visible; when one or more providers are selected, only those providers' models are shown
+- [ ] **Chat input stays disabled after agent end event** — the chat input button is disabled while `isStreaming` is true, but `isStreamFinalizer` only checks for `end_turn`/`end`/`status: done` events; ensure the agent end event clears streaming state properly so the send button re-enables
+- [ ] **Markdown rendering in chat responses** — render assistant text responses as markdown using a library (e.g. `react-markdown`) instead of plain text
+- [ ] **Model selection doesn't work from chat view** — the model switcher dropdown in ChatPanel header doesn't correctly switch the active model; wire `handleSwitchModel` to both `ws.send({ type: "set_model", ... })` and the AppContext so the WS session uses the new model
+- [ ] **Tool call rendering: collapsible with default collapsed** — tool call pills should expand to show a collapsible section with the tool's input/output; section defaults to collapsed state with expand/collapse toggle
 
 ### Medium-term
 - [ ] **Typing indicator for streaming** — show "Pi is thinking" during the initial delay before first event arrives

@@ -73,7 +73,7 @@ export async function listProjects(): Promise<string[]> {
 
 /** List all active sessions across all projects */
 export async function listSessions(): Promise<SessionListItem[]> {
-	return request<SessionListItem[]>("/api/sessions");
+	return request<SessionListItem[]>("/api/projects/sessions");
 }
 
 /** Get project details including all active sessions */

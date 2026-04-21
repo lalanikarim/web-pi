@@ -260,18 +260,17 @@ export default function FolderSelector() {
 	>([]);
 	const [sessionsLoaded, setSessionsLoaded] = useState(false);
 
-	// Fetch active sessions when Sessions tab is shown
+	// Fetch active sessions on mount (always, so the Sessions tab can appear)
 	useEffect(() => {
-		if (activeTab === "sessions" && !sessionsLoaded) {
-			listSessions()
-				.then((s) => {
-					const running = s.filter((item) => item.status === "running");
-					setSessions(running);
-					setSessionsLoaded(true);
-				})
-				.catch(() => {});
-		}
-	}, [activeTab]);
+		if (sessionsLoaded) return;
+		listSessions()
+			.then((s) => {
+				const running = s.filter((item) => item.status === "running");
+				setSessions(running);
+				setSessionsLoaded(true);
+			})
+			.catch(() => setSessionsLoaded(true));
+	}, []);
 
 	const handleOpen = (path: string) => {
 		setSelectedFolder(path);
@@ -284,22 +283,23 @@ export default function FolderSelector() {
 		session_id: string;
 		project_path: string;
 		model_id: string;
+		name: string;
+		status: string;
+		ws_connected: boolean;
+		created_at: string;
 	}) => {
 		setSelectedSession({
 			session_id: session.session_id,
+			name: session.name,
 			project_path: session.project_path,
-			name: "",
 			model_id: session.model_id,
-			status: "running",
-			created_at: "",
-			ws_connected: false,
+			status: session.status,
+			ws_connected: session.ws_connected,
+			created_at: session.created_at,
 		});
 		setSelectedFolder(session.project_path);
 		setSelectedModel(null);
-		// Go directly to workspace (ModelSelector sets the model first, but we can
-		// also go straight to workspace if we already know the model — the WS will
-		// send set_model on connect)
-		setView("models");
+		setView("workspace");
 	};
 
 	const handleToggle = (path: string) => {
