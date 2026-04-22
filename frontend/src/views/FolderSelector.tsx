@@ -1,6 +1,11 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useApp } from "../store/AppContext";
-import { listDirectories, listSessions } from "../services/api";
+import {
+	listDirectories,
+	listSessions,
+	closeSession,
+	deleteSession,
+} from "../services/api";
 import "./views.css";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -12,11 +17,66 @@ interface DirItem {
 	name: string;
 }
 
-// ── Session list row component ─────────────────────────────────────────────
+// ---------------------------------------------------------------------------
+// Confirmation dialog for session shutdown
+// ---------------------------------------------------------------------------
+
+function ShutdownDialog({
+	sessionName,
+	onCancel,
+	onGraceful,
+	onForce,
+}: {
+	sessionName: string;
+	onCancel: () => void;
+	onGraceful: () => void;
+	onForce: () => void;
+}) {
+	return (
+		<div className="shutdown-dialog__overlay" onClick={onCancel}>
+			<div
+				className="shutdown-dialog__panel"
+				onClick={(e) => e.stopPropagation()}
+			>
+				<h2 className="shutdown-dialog__title">Shutdown Session</h2>
+				<p className="shutdown-dialog__message">
+					Shutdown <strong>{sessionName}</strong>?
+				</p>
+				<div className="shutdown-dialog__actions">
+					<button
+						className="shutdown-dialog__btn shutdown-dialog__btn--graceful"
+						onClick={onGraceful}
+					>
+						⏻ Graceful
+						<span className="shutdown-dialog__btn--desc">Compact + Abort</span>
+					</button>
+					<button
+						className="shutdown-dialog__btn shutdown-dialog__btn--force"
+						onClick={onForce}
+					>
+						⨟ Force
+						<span className="shutdown-dialog__btn--desc">Abort only</span>
+					</button>
+					<button
+						className="shutdown-dialog__btn shutdown-dialog__btn--cancel"
+						onClick={onCancel}
+					>
+						Cancel
+					</button>
+				</div>
+			</div>
+		</div>
+	);
+}
+
+// ---------------------------------------------------------------------------
+// Session list row component
+// ---------------------------------------------------------------------------
 
 function SessionRow({
 	session,
 	onClick,
+	onShutdown,
 }: {
 	session: {
 		session_id: string;
@@ -28,6 +88,7 @@ function SessionRow({
 		created_at: string;
 	};
 	onClick: () => void;
+	onShutdown: () => void;
 }) {
 	const projectName =
 		session.project_path.split("/").filter(Boolean).pop() ||
@@ -47,6 +108,16 @@ function SessionRow({
 					/>
 					{session.name || projectName}
 				</span>
+				<button
+					className="session-row__shutdown-btn"
+					onClick={(e) => {
+						e.stopPropagation();
+						onShutdown();
+					}}
+					title="Shutdown session"
+				>
+					⏻
+				</button>
 				<span className="session-row__time">{timeStr}</span>
 			</div>
 			<div className="session-row__meta">
@@ -258,6 +329,11 @@ export default function FolderSelector() {
 			created_at: string;
 		}>
 	>([]);
+	const [shutdownTarget, setShutdownTarget] = useState<{
+		session_id: string;
+		name: string;
+	} | null>(null);
+	const [shuttingDown, setShuttingDown] = useState(false);
 	const sessionsFetched = useRef(false);
 
 	// Fetch active sessions on mount (always, so the Sessions tab can appear)
@@ -312,6 +388,40 @@ export default function FolderSelector() {
 			}
 			return next;
 		});
+	};
+
+	// ── Session shutdown handlers ──────────────────────────────────────────
+
+	const handleGracefulShutdown = async () => {
+		if (!shutdownTarget || shuttingDown) return;
+		setShuttingDown(true);
+		try {
+			await closeSession(shutdownTarget.session_id);
+			setSessions((prev) =>
+				prev.filter((s) => s.session_id !== shutdownTarget.session_id),
+			);
+		} catch (e) {
+			console.error("Failed to close session:", e);
+		} finally {
+			setShutdownTarget(null);
+			setShuttingDown(false);
+		}
+	};
+
+	const handleForceShutdown = async () => {
+		if (!shutdownTarget || shuttingDown) return;
+		setShuttingDown(true);
+		try {
+			await deleteSession(shutdownTarget.session_id);
+			setSessions((prev) =>
+				prev.filter((s) => s.session_id !== shutdownTarget.session_id),
+			);
+		} catch (e) {
+			console.error("Failed to delete session:", e);
+		} finally {
+			setShutdownTarget(null);
+			setShuttingDown(false);
+		}
 	};
 
 	const hasSessions = sessions.length > 0;
@@ -398,6 +508,12 @@ export default function FolderSelector() {
 										key={session.session_id}
 										session={session}
 										onClick={() => handleSelectSession(session)}
+										onShutdown={() =>
+											setShutdownTarget({
+												session_id: session.session_id,
+												name: session.name,
+											})
+										}
 									/>
 								))
 							)}
@@ -405,6 +521,16 @@ export default function FolderSelector() {
 					)}
 				</div>
 			</div>
+
+			{/* Shutdown confirmation dialog */}
+			{shutdownTarget && (
+				<ShutdownDialog
+					sessionName={shutdownTarget.name}
+					onCancel={() => setShutdownTarget(null)}
+					onGraceful={handleGracefulShutdown}
+					onForce={handleForceShutdown}
+				/>
+			)}
 		</div>
 	);
 }

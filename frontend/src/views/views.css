@@ -723,3 +723,159 @@
 .session-row__divider {
 	color: #334155;
 }
+
+/* ── Session shutdown button ─────────────────────────────────────────── */
+
+.session-row__shutdown-btn {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 22px;
+	height: 22px;
+	padding: 0;
+	background: transparent;
+	border: 1px solid transparent;
+	border-radius: 4px;
+	color: #475569;
+	font-size: 14px;
+	cursor: pointer;
+	transition: all 0.15s;
+	flex-shrink: 0;
+	opacity: 0;
+}
+
+.session-row:hover .session-row__shutdown-btn {
+	opacity: 1;
+}
+
+.session-row__shutdown-btn:hover {
+	background: rgba(239, 68, 68, 0.15);
+	border-color: rgba(239, 68, 68, 0.4);
+	color: #ef4444;
+}
+
+.session-row__shutdown-btn:focus-visible {
+	outline: 2px solid #ef4444;
+	outline-offset: 1px;
+}
+
+/* ── Shutdown dialog ─────────────────────────────────────────────────── */
+
+.shutdown-dialog__overlay {
+	position: fixed;
+	inset: 0;
+	background: rgba(0, 0, 0, 0.6);
+	backdrop-filter: blur(4px);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	z-index: 1000;
+	animation: fadeIn 0.12s ease-out;
+}
+
+@keyframes fadeIn {
+	from {
+		opacity: 0;
+	}
+	to {
+		opacity: 1;
+	}
+}
+
+@keyframes slideUp {
+	from {
+		opacity: 0;
+		transform: translateY(12px) scale(0.97);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0) scale(1);
+	}
+}
+
+.shutdown-dialog__panel {
+	background: #1e293b;
+	border: 1px solid #334155;
+	border-radius: 12px;
+	padding: 24px;
+	width: 100%;
+	max-width: 380px;
+	box-shadow: 0 24px 48px rgba(0, 0, 0, 0.4);
+	animation: slideUp 0.15s ease-out;
+}
+
+.shutdown-dialog__title {
+	margin: 0 0 12px;
+	font-size: 18px;
+	font-weight: 600;
+	color: #f1f5f9;
+}
+
+.shutdown-dialog__message {
+	margin: 0 0 20px;
+	font-size: 14px;
+	color: #94a3b8;
+	line-height: 1.5;
+}
+
+.shutdown-dialog__actions {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.shutdown-dialog__btn {
+	width: 100%;
+	padding: 10px 16px;
+	border: 1px solid #334155;
+	border-radius: 8px;
+	font-size: 14px;
+	font-family: inherit;
+	font-weight: 500;
+	cursor: pointer;
+	transition: all 0.15s;
+	text-align: left;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	align-items: flex-start;
+}
+
+.shutdown-dialog__btn--desc {
+	font-size: 11px;
+	font-weight: 400;
+	color: #64748b;
+}
+
+.shutdown-dialog__btn--graceful {
+	background: #1e3a5f;
+	border-color: #3b82f6;
+	color: #e2e8f0;
+}
+
+.shutdown-dialog__btn--graceful:hover {
+	background: #1e40af;
+	border-color: #60a5fa;
+}
+
+.shutdown-dialog__btn--force {
+	background: #3b1a1a;
+	border-color: #991b1b;
+	color: #fca5a5;
+}
+
+.shutdown-dialog__btn--force:hover {
+	background: #7f1d1d;
+	border-color: #f87171;
+}
+
+.shutdown-dialog__btn--cancel {
+	background: transparent;
+	border-color: #334155;
+	color: #94a3b8;
+}
+
+.shutdown-dialog__btn--cancel:hover {
+	background: #334155;
+	color: #e2e8f0;
+}
