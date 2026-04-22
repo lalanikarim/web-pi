@@ -738,7 +738,7 @@ export default function ChatPanel() {
 				)}
 
 				{/* Session controls */}
-				<div style={{ display: "flex", gap: 4 }}>
+				<div className="chat-header-controls">
 					{closingState === "none" ? (
 						<>
 							<button
@@ -757,7 +757,6 @@ export default function ChatPanel() {
 									<circle cx="12" cy="12" r="10" />
 									<path d="M12 6v6l4 2" />
 								</svg>
-								Compact
 							</button>
 							<button
 								className="btn btn--sm btn--close"
@@ -774,7 +773,6 @@ export default function ChatPanel() {
 								>
 									<path d="M18 6L6 18M6 6l12 12" />
 								</svg>
-								Close
 							</button>
 							<button
 								className="btn btn--sm btn--delete"
@@ -791,7 +789,6 @@ export default function ChatPanel() {
 								>
 									<path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
 								</svg>
-								Delete
 							</button>
 						</>
 					) : (
