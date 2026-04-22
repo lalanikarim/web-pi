@@ -30,6 +30,132 @@ interface DisplayMessage {
 	timestamp: number;
 }
 
+/** Raw message returned by Pi RPC get_messages command */
+type AgentMessage = Record<string, unknown>;
+
+/**
+ * Convert a Pi RPC AgentMessage into a DisplayMessage for rendering.
+ * Handles user, assistant, tool result, and bash execution messages.
+ */
+function agentMessageToDisplay(
+	msg: AgentMessage,
+	index: number,
+): DisplayMessage | null {
+	const role = msg.role as string;
+	const timestamp =
+		typeof msg.timestamp === "number" ? msg.timestamp : Date.now();
+
+	if (role === "user") {
+		let content: string;
+		if (typeof msg.content === "string") {
+			content = msg.content;
+		} else if (Array.isArray(msg.content)) {
+			const blocks = msg.content as Array<{ type?: string; text?: string }>;
+			content =
+				blocks
+					.filter((b) => b.type === "text")
+					.map((b) => b.text || "")
+					.join("\n") || "[image attachment]";
+		} else {
+			content = "";
+		}
+		return {
+			id: `history-user-${index}`,
+			role: "user",
+			content,
+			toolCalls: [],
+			timestamp,
+		};
+	}
+
+	if (role === "assistant") {
+		const blocks = msg.content as
+			| Array<{
+					type?: string;
+					text?: string;
+					thinking?: string;
+					name?: string;
+					arguments?: unknown;
+			  }>
+			| undefined;
+		if (!blocks) return null;
+		const textParts: string[] = [];
+		const toolCalls: ToolCallEntry[] = [];
+		const thinkingParts: string[] = [];
+		for (const block of blocks) {
+			if (typeof block !== "object" || block === null) continue;
+			if (block.type === "text" && block.text) textParts.push(block.text);
+			else if (block.type === "thinking" && block.thinking)
+				thinkingParts.push(
+					"[thinking] " + block.thinking.substring(0, 120) + "...",
+				);
+			else if (block.type === "toolCall") {
+				const entry: ToolCallEntry = { name: block.name || "unknown" };
+				if (block.arguments) {
+					try {
+						entry.args =
+							typeof block.arguments === "string"
+								? block.arguments
+								: JSON.stringify(block.arguments);
+					} catch {
+						entry.args = String(block.arguments);
+					}
+				}
+				toolCalls.push(entry);
+			}
+		}
+		const content = [thinkingParts.join("\n"), textParts.join("\n")]
+			.filter(Boolean)
+			.join("\n\n");
+		if (!content && toolCalls.length === 0) return null;
+		return {
+			id: `history-assistant-${index}`,
+			role: "assistant",
+			content,
+			toolCalls,
+			timestamp,
+		};
+	}
+
+	if (role === "toolResult" && msg.content) {
+		let content: string;
+		if (Array.isArray(msg.content)) {
+			const blocks = msg.content as Array<{ type?: string; text?: string }>;
+			content = blocks
+				.filter((b) => b.type === "text")
+				.map((b) => b.text || "")
+				.join("\n");
+		} else if (typeof msg.content === "string") {
+			content = msg.content;
+		} else {
+			content = "";
+		}
+		if (!content) return null;
+		const toolName = (msg.toolName as string) || "tool";
+		const isError = msg.isError;
+		return {
+			id: `history-tool-${index}`,
+			role: "assistant",
+			content: `> ${toolName}${isError ? " (error)" : ""}\n\n\`${content.substring(0, 200)}${content.length > 200 ? "..." : ""}\``,
+			toolCalls: [],
+			timestamp,
+		};
+	}
+
+	if (role === "bashExecution" && msg.command) {
+		const output = (msg.output as string) || "";
+		return {
+			id: `history-bash-${index}`,
+			role: "assistant",
+			content: `\`bash\` ${msg.command as string} → exit code ${msg.exitCode ?? "?"}\n\n${output.substring(0, 300)}${output.length > 300 ? "..." : ""}`,
+			toolCalls: [],
+			timestamp,
+		};
+	}
+
+	return null;
+}
+
 // ---------------------------------------------------------------------------
 // Helpers — extract content from Pi RPC events
 // Per the official RPC protocol, message_update events contain:
@@ -374,9 +500,27 @@ export default function ChatPanel() {
 		const newMessages = ws.messages.slice(processedCountRef.current);
 
 		for (const msg of newMessages) {
-			// ── Handle get_state responses to update currentModel ─────────
+			// ── Handle get_messages responses (chat history) ───────────────
 			if (msg.kind === "rpc_response") {
 				const response = msg.response as Record<string, unknown>;
+				if (
+					response.type === "response" &&
+					response.command === "get_messages"
+				) {
+					const data = response.data as
+						| { messages?: AgentMessage[] }
+						| undefined;
+					if (data?.messages) {
+						const history = data.messages
+							.map((m, i) => agentMessageToDisplay(m, i))
+							.filter((m): m is DisplayMessage => m !== null);
+						if (history.length > 0) {
+							setDisplayMessages((prev) => [...prev, ...history]);
+						}
+					}
+					continue;
+				}
+				// ── Handle get_state responses to update currentModel ───────
 				if (
 					response.type === "response" &&
 					response.command === "get_state" &&
@@ -393,7 +537,6 @@ export default function ChatPanel() {
 							modelSetFromStateRef.current = true;
 						}
 					}
-					continue;
 				}
 				continue;
 			}
