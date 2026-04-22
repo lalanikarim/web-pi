@@ -57,14 +57,18 @@ interface UseModelsResult {
  * Fetch available models from Pi RPC.
  *
  * Flow:
- * 1. If projectPath is provided, create a Pi RPC session
+ * 1. If projectPath is provided, create a Pi RPC session (unless existingSessionId is provided)
  * 2. Poll `/api/models?session_id=...` until models arrive or timeout
  * 3. Fall back to defaults on error or timeout
  *
  * @param projectPath — optional project folder path (triggers session creation)
+ * @param existingSessionId — optional existing session id to use instead of creating one
  * @returns models list, loading state, error message, and session_id for WS connection
  */
-export function useModels(projectPath?: string | null): UseModelsResult {
+export function useModels(
+	projectPath?: string | null,
+	existingSessionId?: string | null,
+): UseModelsResult {
 	const [models, setModels] = useState<Model[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
@@ -110,11 +114,11 @@ export function useModels(projectPath?: string | null): UseModelsResult {
 			}
 
 			// Step 1: Launch pi RPC session (model is set later via WS `set_model` on connect)
-			let activeSessionId = sessionId;
-			if (!launchedRef.current) {
+			let activeSessionId = existingSessionId || sessionId;
+			if (!launchedRef.current && !existingSessionId) {
 				launchedRef.current = true;
 				try {
-					const session = await createSession(projectPath);
+					const session = await createSession(projectPath!);
 					activeSessionId = session.session_id;
 					setSessionId(session.session_id);
 					if (session.running_count !== undefined) {
@@ -127,6 +131,9 @@ export function useModels(projectPath?: string | null): UseModelsResult {
 					}
 					return;
 				}
+			} else if (existingSessionId) {
+				launchedRef.current = true;
+				activeSessionId = existingSessionId;
 			}
 
 			if (!activeSessionId) {
