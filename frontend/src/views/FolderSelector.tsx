@@ -424,8 +424,6 @@ export default function FolderSelector() {
 		}
 	};
 
-	const hasSessions = sessions.length > 0;
-
 	return (
 		<div className="view-folder">
 			<div className="view-folder__inner">
@@ -437,22 +435,20 @@ export default function FolderSelector() {
 				</div>
 
 				{/* Tabs */}
-				{hasSessions && (
-					<div className="view-folder__tabs">
-						<button
-							className={`view-folder__tab ${activeTab === "projects" ? "view-folder__tab--active" : ""}`}
-							onClick={() => setActiveTab("projects")}
-						>
-							Projects
-						</button>
-						<button
-							className={`view-folder__tab ${activeTab === "sessions" ? "view-folder__tab--active" : ""}`}
-							onClick={() => setActiveTab("sessions")}
-						>
-							Sessions {sessions.length > 0 && `(${sessions.length})`}
-						</button>
-					</div>
-				)}
+				<div className="view-folder__tabs">
+					<button
+						className={`view-folder__tab ${activeTab === "projects" ? "view-folder__tab--active" : ""}`}
+						onClick={() => setActiveTab("projects")}
+					>
+						Projects
+					</button>
+					<button
+						className={`view-folder__tab ${activeTab === "sessions" ? "view-folder__tab--active" : ""}`}
+						onClick={() => setActiveTab("sessions")}
+					>
+						Sessions {sessions.length > 0 && `(${sessions.length})`}
+					</button>
+				</div>
 
 				{/* Search */}
 				<div className="view-folder__search">
