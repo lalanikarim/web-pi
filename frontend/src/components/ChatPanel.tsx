@@ -273,9 +273,6 @@ export default function ChatPanel() {
 	const isStreaming =
 		streamingContent.trim().length > 0 || toolCalls.length > 0;
 
-	// ── Chat panel expand state ────────────────────────────────────────────
-	const [isExpanded, setIsExpanded] = useState(false);
-
 	// Track if history load has been requested (ref to avoid effect cycles)
 	const historyRequestedRef = useRef(false);
 
@@ -739,39 +736,6 @@ export default function ChatPanel() {
 						Clear
 					</button>
 				)}
-
-				{/* Expand/collapse chat */}
-				<button
-					className="btn btn--sm btn--expand"
-					onClick={() => setIsExpanded(!isExpanded)}
-					title={isExpanded ? "Collapse chat" : "Expand chat"}
-				>
-					{isExpanded ? (
-						<svg
-							viewBox="0 0 24 24"
-							fill="none"
-							stroke="currentColor"
-							strokeWidth="2"
-							width="14"
-							height="14"
-						>
-							<path d="M18 6L6 18M6 6l12 12" />
-						</svg>
-					) : (
-						<svg
-							viewBox="0 0 24 24"
-							fill="none"
-							stroke="currentColor"
-							strokeWidth="2"
-							width="14"
-							height="14"
-						>
-							<rect x="3" y="3" width="18" height="18" rx="2" />
-							<path d="M9 3v18" />
-						</svg>
-					)}
-					{isExpanded ? "Collapse" : "Expand"}
-				</button>
 
 				{/* Session controls */}
 				<div style={{ display: "flex", gap: 4 }}>
