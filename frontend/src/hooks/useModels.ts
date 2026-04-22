@@ -100,12 +100,13 @@ export function useModels(projectPath?: string | null): UseModelsResult {
 
 			// Step 0: Check cache first
 			const cachedModels = getCachedModels();
+			let useCache = false;
 			if (cachedModels && cachedModels.length > 0) {
 				if (!abortControllerRef.current?.signal.aborted) {
 					setModels(cachedModels);
 					setLoading(false);
+					useCache = true;
 				}
-				// Still poll in background to refresh cache
 			}
 
 			// Step 1: Launch pi RPC session (model is set later via WS `set_model` on connect)
@@ -134,6 +135,10 @@ export function useModels(projectPath?: string | null): UseModelsResult {
 			}
 
 			// Step 2: Poll for real models from Pi (via session)
+			// Skip polling if we already have cached models
+			if (useCache) {
+				return;
+			}
 			const deadline = Date.now() + PI_INIT_TIMEOUT_MS;
 			while (
 				Date.now() < deadline &&
