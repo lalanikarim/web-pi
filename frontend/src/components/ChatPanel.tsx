@@ -738,7 +738,7 @@ export default function ChatPanel() {
 				)}
 
 				{/* Session controls */}
-				<div className="chat-header-controls">
+				<div className="chat-header-controls" data-panel="chat">
 					{closingState === "none" ? (
 						<>
 							<button
