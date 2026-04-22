@@ -130,19 +130,21 @@
 
 /* ── Session controls wrapper ──────────────────────────────────────── */
 
+/* Session controls on their own row below the main header */
 .chat-header-controls {
 	display: flex;
 	gap: 2px;
-	flex-shrink: 0;
-	flex-wrap: wrap;
 	justify-content: flex-end;
-	margin-left: auto;
+	padding: 4px 12px 2px;
+	border-top: 1px solid #334155;
+	background: #1e293b;
+	flex-shrink: 0;
 }
 
-/* Icon-only buttons in the chat panel header */
-.panel__header--chat .btn--compact,
-.panel__header--chat .btn--close,
-.panel__header--chat .btn--delete {
+/* Icon-only buttons in the session controls row */
+.chat-header-controls .btn--compact,
+.chat-header-controls .btn--close,
+.chat-header-controls .btn--delete {
 	padding: 4px;
 	min-width: 26px;
 	height: 26px;
@@ -151,22 +153,11 @@
 	justify-content: center;
 }
 
-.panel__header--chat .btn--compact svg,
-.panel__header--chat .btn--close svg,
-.panel__header--chat .btn--delete svg {
+.chat-header-controls .btn--compact svg,
+.chat-header-controls .btn--close svg,
+.chat-header-controls .btn--delete svg {
 	width: 14px;
 	height: 14px;
-}
-
-/* Push session controls to their own row when the panel is narrow */
-@media (max-width: 420px) {
-	.panel__header--chat .chat-header-controls {
-		width: 100%;
-		justify-content: flex-end;
-		padding-top: 2px;
-		border-top: 1px solid #334155;
-		margin-top: 4px;
-	}
 }
 
 .panel__header--chat > span:first-child {
