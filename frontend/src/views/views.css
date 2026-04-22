@@ -429,6 +429,24 @@
 	justify-content: center;
 }
 
+.view-workspace__project-title {
+	font-size: 16px;
+	font-weight: 600;
+	color: #94a3b8;
+	cursor: pointer;
+	padding: 4px 12px;
+	border-radius: 6px;
+	user-select: none;
+	transition:
+		color 0.15s ease,
+		background 0.15s ease;
+}
+
+.view-workspace__project-title:hover {
+	color: #e2e8f0;
+	background: rgba(255, 255, 255, 0.06);
+}
+
 .view-workspace__header-right {
 	display: flex;
 	align-items: center;

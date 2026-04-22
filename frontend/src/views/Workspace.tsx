@@ -6,7 +6,7 @@ import FilePreview from "../components/FilePreview";
 import ChatPanel from "../components/ChatPanel";
 
 export default function Workspace() {
-	const { currentModel, selectedFolder } = useApp();
+	const { setView, selectedFolder } = useApp();
 	const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 	const [chatExpanded, setChatExpanded] = useState(false);
 	const [runningCount, setRunningCount] = useState<number | null>(null);
@@ -50,8 +50,12 @@ export default function Workspace() {
 					</span>
 				</div>
 				<div className="view-workspace__header-center">
-					<span className="view-workspace__model-badge">
-						{currentModel?.name}
+					<span
+						className="view-workspace__project-title"
+						onClick={() => setView("folders")}
+						title="Back to folder view"
+					>
+						Pi Coding Agent
 					</span>
 				</div>
 				<div className="view-workspace__header-right">
