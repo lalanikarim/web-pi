@@ -28,6 +28,8 @@ interface DisplayMessage {
 	content: string;
 	toolCalls: ToolCallEntry[];
 	timestamp: number;
+	/** Stable unique ID for React keys (auto-generated for history) */
+	stableId?: string;
 }
 
 /** Raw message returned by Pi RPC get_messages command */
@@ -37,10 +39,7 @@ type AgentMessage = Record<string, unknown>;
  * Convert a Pi RPC AgentMessage into a DisplayMessage for rendering.
  * Handles user, assistant, tool result, and bash execution messages.
  */
-function agentMessageToDisplay(
-	msg: AgentMessage,
-	index: number,
-): DisplayMessage | null {
+function agentMessageToDisplay(msg: AgentMessage): DisplayMessage | null {
 	const role = msg.role as string;
 	const timestamp =
 		typeof msg.timestamp === "number" ? msg.timestamp : Date.now();
@@ -60,7 +59,7 @@ function agentMessageToDisplay(
 			content = "";
 		}
 		return {
-			id: `history-user-${index}`,
+			id: `history-user-${crypto.randomUUID()}`,
 			role: "user",
 			content,
 			toolCalls: [],
@@ -109,7 +108,7 @@ function agentMessageToDisplay(
 			.join("\n\n");
 		if (!content && toolCalls.length === 0) return null;
 		return {
-			id: `history-assistant-${index}`,
+			id: `history-assistant-${crypto.randomUUID()}`,
 			role: "assistant",
 			content,
 			toolCalls,
@@ -134,7 +133,7 @@ function agentMessageToDisplay(
 		const toolName = (msg.toolName as string) || "tool";
 		const isError = msg.isError;
 		return {
-			id: `history-tool-${index}`,
+			id: `history-tool-${crypto.randomUUID()}`,
 			role: "assistant",
 			content: `> ${toolName}${isError ? " (error)" : ""}\n\n\`${content.substring(0, 200)}${content.length > 200 ? "..." : ""}\``,
 			toolCalls: [],
@@ -145,7 +144,7 @@ function agentMessageToDisplay(
 	if (role === "bashExecution" && msg.command) {
 		const output = (msg.output as string) || "";
 		return {
-			id: `history-bash-${index}`,
+			id: `history-bash-${crypto.randomUUID()}`,
 			role: "assistant",
 			content: `\`bash\` ${msg.command as string} → exit code ${msg.exitCode ?? "?"}\n\n${output.substring(0, 300)}${output.length > 300 ? "..." : ""}`,
 			toolCalls: [],
@@ -512,7 +511,7 @@ export default function ChatPanel() {
 						| undefined;
 					if (data?.messages) {
 						const history = data.messages
-							.map((m, i) => agentMessageToDisplay(m, i))
+							.map((m) => agentMessageToDisplay(m))
 							.filter((m): m is DisplayMessage => m !== null);
 						if (history.length > 0) {
 							setDisplayMessages((prev) => [...prev, ...history]);
