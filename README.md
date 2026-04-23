@@ -75,6 +75,33 @@ Navigate to **http://localhost:5173** and:
 2. **Pick a model** — Pi will list available models via RPC
 3. **Start chatting** — sessions run as separate `pi --rpc` processes
 
+## Screenshots
+
+### Project Selection
+Choose a project directory from your filesystem to work with.
+
+![Project Selection](./screenshots/1.ProjectSelection.png)
+
+### Model Selection
+Select an AI model for your session. Pi fetches available models via RPC.
+
+![Model Selection](./screenshots/2.ModelSelection.png)
+
+### Workspace View
+The main workspace with file browser on the left and chat panel on the right.
+
+![Workspace View](./screenshots/3.WorkspaceView.png)
+
+### Active Sessions
+View and manage active Pi sessions. Each session runs its own `pi --rpc` process.
+
+![Active Sessions](./screenshots/4.ActiveSessions.png)
+
+### Exit Session
+Close a session to compact, abort, and terminate the underlying process.
+
+![Exit Session](./screenshots/5.ExitSession.png)
+
 ### Running tests
 
 ```bash
